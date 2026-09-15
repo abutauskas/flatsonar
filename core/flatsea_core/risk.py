@@ -238,7 +238,8 @@ def _env(value: str) -> tuple[RiskLevel, str]:
     return RiskLevel.GREEN, f"sets environment variable {key}"
 
 
-_RESTRICTIVE = {"nofilesystem", "nosocket", "nodevice", "noshare", "unshare", "no-talk-name", "disallow", "nousb"}
+_RESTRICTIVE = {"nofilesystem", "nosocket", "nodevice", "noshare", "unshare", "no-talk-name", "disallow", "nousb",
+                "unset-env"}
 _NEUTRAL = {"extension", "metadata", "sdk-extension", "runtime-extension", "require-version", "usb",
             "add-policy", "remove-policy"}
 
