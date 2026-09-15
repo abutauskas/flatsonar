@@ -1,12 +1,12 @@
-from flatsea_core import parse_manifest_text
+from flatsonar_core import parse_manifest_text
 
-from flatsea_server.crawler import funding
-from flatsea_server.crawler.appstream import parse_metainfo
-from flatsea_server.crawler.base import Candidate, SourceSpec, upsert_candidate
-from flatsea_server.crawler.credit import normalise_repo_url
-from flatsea_server.crawler.flathub import permissions_to_finish_args
-from flatsea_server.crawler.forge import find_icon, find_manifests, find_metainfo
-from flatsea_server.models import App, SourceKind
+from flatsonar_server.crawler import funding
+from flatsonar_server.crawler.appstream import parse_metainfo
+from flatsonar_server.crawler.base import Candidate, SourceSpec, upsert_candidate
+from flatsonar_server.crawler.credit import normalise_repo_url
+from flatsonar_server.crawler.flathub import permissions_to_finish_args
+from flatsonar_server.crawler.forge import find_icon, find_manifests, find_metainfo
+from flatsonar_server.models import App, SourceKind
 
 MANIFEST = """
 app-id: com.example.Hunted

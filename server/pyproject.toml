@@ -3,13 +3,13 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "flatsea-server"
+name = "flatsonar-server"
 version = "0.1.0"
-description = "Flatsea API server and crawler: hunts open-source Flatpak apps across Flathub, GitHub, GitLab and Codeberg"
+description = "Flatsonar API server and crawler: hunts open-source Flatpak apps across Flathub, GitHub, GitLab and Codeberg"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.12"
 dependencies = [
-    "flatsea-core",
+    "flatsonar-core",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0",
@@ -24,10 +24,10 @@ dev = ["pytest>=8", "pytest-asyncio>=0.23", "respx>=0.21"]
 postgres = ["psycopg[binary]>=3"]
 
 [project.scripts]
-flatsea-crawl = "flatsea_server.crawler.run:main"
+flatsonar-crawl = "flatsonar_server.crawler.run:main"
 
 [tool.setuptools.packages.find]
-include = ["flatsea_server*"]
+include = ["flatsonar_server*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

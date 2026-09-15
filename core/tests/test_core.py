@@ -1,12 +1,12 @@
 import pytest
 
-from flatsea_core import (
+from flatsonar_core import (
     RiskLevel,
     is_open_source,
     parse_manifest_text,
     score_finish_args,
 )
-from flatsea_core.manifest import ManifestError, looks_like_manifest
+from flatsonar_core.manifest import ManifestError, looks_like_manifest
 
 # --- fixtures shaped like real Flathub manifests -----------------------------
 
@@ -252,7 +252,7 @@ directory=extensions
 
 
 def test_metadata_to_finish_args():
-    from flatsea_core import metadata_app_id, metadata_to_finish_args, score_finish_args
+    from flatsonar_core import metadata_app_id, metadata_to_finish_args, score_finish_args
 
     args = metadata_to_finish_args(GIMP_METADATA)
     assert "--filesystem=host" in args

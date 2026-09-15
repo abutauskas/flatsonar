@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from flatsea.api import AppInfo, InstallSource
-from flatsea.install import flatpak_cli as fp
-from flatsea.install import pipeline
-from flatsea.install.scan import ScanResult
-from flatsea.state import Decisions
+from flatsonar.api import AppInfo, InstallSource
+from flatsonar.install import flatpak_cli as fp
+from flatsonar.install import pipeline
+from flatsonar.install.scan import ScanResult
+from flatsonar.state import Decisions
 
 GREEN_META = "[Application]\nname=org.x.Green\n\n[Context]\nsockets=wayland;\nshared=network;\n"
 RED_META = "[Application]\nname=org.x.Red\n\n[Context]\nsockets=wayland;\nfilesystems=host;\ndevices=all;\n"

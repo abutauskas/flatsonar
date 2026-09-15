@@ -13,6 +13,8 @@ dist/
 # Local state
 server/.env
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 server/data/
 .crawl-cache/

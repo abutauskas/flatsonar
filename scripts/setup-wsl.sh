@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup for running the Flatsea client inside WSL2 (Ubuntu) or any Debian-based distro.
+# One-time setup for running the Flatsonar client inside WSL2 (Ubuntu) or any Debian-based distro.
 set -euo pipefail
 
 if ! command -v apt-get >/dev/null; then
@@ -35,4 +35,4 @@ fi
 echo
 echo "Done. Next:"
 echo "  pip install --user -e core -e client"
-echo "  FLATSEA_API=http://localhost:8000 python3 -m flatsea"
+echo "  FLATSONAR_API=http://localhost:8000 python3 -m flatsonar"

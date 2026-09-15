@@ -1,11 +1,11 @@
-# Flatsea
+# Flatsonar
 
-**F-Droid for Linux.** Flatsea hunts down open-source Flatpak apps wherever they
+**F-Droid for Linux.** Flatsonar hunts down open-source Flatpak apps wherever they
 live — Flathub, GitHub, GitLab, Codeberg, project-hosted remotes, `.flatpak`
 bundles attached to releases — and puts them in one store. Every listing
 credits the original creators and shows a **Sponsor** button.
 
-You can install anything. Flatsea reads each app's sandbox permissions and runs
+You can install anything. Flatsonar reads each app's sandbox permissions and runs
 a local ClamAV scan before deploying; if something looks dangerous it warns you
 and asks you to press **Sure** twice. After that, it's your call.
 
@@ -13,9 +13,9 @@ and asks you to press **Sure** twice. After that, it's your call.
 
 | Directory | What | Runs on |
 |-----------|------|---------|
-| `core/`   | `flatsea_core` — manifest parsing, risk scoring, SPDX allow-list | anywhere |
-| `server/` | `flatsea_server` — FastAPI + crawler ("the hunt") | anywhere |
-| `client/` | `flatsea` — GTK4 / libadwaita desktop app | Linux (WSL2 + WSLg is fine for dev) |
+| `core/`   | `flatsonar_core` — manifest parsing, risk scoring, SPDX allow-list | anywhere |
+| `server/` | `flatsonar_server` — FastAPI + crawler ("the hunt") | anywhere |
+| `client/` | `flatsonar` — GTK4 / libadwaita desktop app | Linux (WSL2 + WSLg is fine for dev) |
 
 ## Quick start
 
@@ -26,8 +26,8 @@ python -m venv .venv
 . .venv/Scripts/activate        # Linux: . .venv/bin/activate
 pip install -e core -e server
 cp server/.env.example server/.env   # add GITHUB_TOKEN for off-Flathub hunting
-python -m flatsea_server.crawler.run --source flathub --limit 100
-uvicorn flatsea_server.main:app --reload
+python -m flatsonar_server.crawler.run --source flathub --limit 100
+uvicorn flatsonar_server.main:app --reload
 ```
 
 Then open http://localhost:8000/docs.
@@ -37,7 +37,7 @@ Then open http://localhost:8000/docs.
 ```sh
 ./scripts/setup-wsl.sh          # once: GTK4, libadwaita, flatpak, clamav
 pip install --user -e core -e client
-FLATSEA_API=http://localhost:8000 python -m flatsea
+FLATSONAR_API=http://localhost:8000 python -m flatsonar
 ```
 
 On Windows the server can stay on the Windows side; WSL2 reaches it at
@@ -59,7 +59,7 @@ tested with fakes, so the whole suite runs on Windows without GTK or flatpak.
 1. `flatpak install --no-deploy` pulls the app into the local OSTree repo without deploying it.
 2. `ostree checkout` materialises the files; ClamAV scans them.
 3. The deployed `metadata` file is parsed back into `finish-args` and scored with
-   `flatsea_core.risk` (host filesystem, `--device=all`, session/system bus, sandbox
+   `flatsonar_core.risk` (host filesystem, `--device=all`, session/system bus, sandbox
    escape via `org.freedesktop.Flatpak`, `LD_PRELOAD`, credential paths ... -> red;
    X11, home folder, keyring, ... -> yellow). The index's score is only a preview; the
    real files decide.
@@ -67,12 +67,12 @@ tested with fakes, so the whole suite runs on Windows without GTK or flatpak.
    Two "Sure"s and it deploys. Accepted findings are remembered per app until
    its permissions change.
 
-Flatsea packaged as a Flatpak scores **red** by its own rules: a store has to talk to
+Flatsonar packaged as a Flatpak scores **red** by its own rules: a store has to talk to
 `org.freedesktop.Flatpak` to install things on the host. That is the honest answer.
 
 ## Hunting
 
-`python -m flatsea_server.crawler.run --source all` walks:
+`python -m flatsonar_server.crawler.run --source all` walks:
 
 - **Flathub** - API v2 for metadata and the *deployed* permissions, plus the
   `github.com/flathub/<id>` manifest for `sources` (that's where the upstream repo and
@@ -88,5 +88,5 @@ Only OSI/FSF-approved SPDX licenses are listed. Proprietary apps on Flathub are 
 
 ## License
 
-GPL-3.0-or-later. Every app listed in Flatsea belongs to its own authors under
-its own license — Flatsea just points at them.
+GPL-3.0-or-later. Every app listed in Flatsonar belongs to its own authors under
+its own license — Flatsonar just points at them.

@@ -3,19 +3,19 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "flatsea"
+name = "flatsonar"
 version = "0.1.0"
-description = "Flatsea desktop client: an F-Droid-style store for open-source Flatpak apps (GTK4 + libadwaita)"
+description = "Flatsonar desktop client: an F-Droid-style store for open-source Flatpak apps (GTK4 + libadwaita)"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.12"
 # PyGObject itself comes from the distro (python3-gi); pip can't sensibly build it.
-dependencies = ["flatsea-core", "httpx>=0.27"]
+dependencies = ["flatsonar-core", "httpx>=0.27"]
 
 [project.scripts]
-flatsea = "flatsea.main:main"
+flatsonar = "flatsonar.main:main"
 
 [tool.setuptools.packages.find]
-include = ["flatsea*"]
+include = ["flatsonar*"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

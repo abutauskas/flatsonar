@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.orm import sessionmaker
 
-from flatsea_server import db as dbmod
-from flatsea_server.db import Base, make_engine
+from flatsonar_server import db as dbmod
+from flatsonar_server.db import Base, make_engine
 
 
 @pytest.fixture()
@@ -21,8 +21,8 @@ def session(monkeypatch):
 def client(session):
     from fastapi.testclient import TestClient
 
-    from flatsea_server.db import get_session
-    from flatsea_server.main import app
+    from flatsonar_server.db import get_session
+    from flatsonar_server.main import app
 
     def _override():
         yield session
