@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import time
 from pathlib import Path
 
 from flatsea_core import RiskReport
 
-DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "flatsea"
+from .paths import data_dir
+
+DATA_DIR = data_dir() / "flatsea"
 
 
 class Decisions:

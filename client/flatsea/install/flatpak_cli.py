@@ -13,10 +13,12 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+from ..paths import cache_dir, data_dir
+
 log = logging.getLogger("flatsea.flatpak")
 
-FLATPAK_USER_REPO = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "flatpak/repo"
-CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "flatsea"
+FLATPAK_USER_REPO = data_dir() / "flatpak/repo"
+CACHE = cache_dir() / "flatsea"
 LOCAL_REMOTE = "flatsea-local"  # where locally built (manifest-only) apps are exported
 
 # When Flatsea itself runs as a Flatpak, host commands go through the portal.

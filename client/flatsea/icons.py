@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
-from pathlib import Path
 
 import httpx
 from gi.repository import Gdk, GLib, Gtk
 
+from .paths import cache_dir
+
 log = logging.getLogger("flatsea.icons")
 
-ICON_CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "flatsea" / "icons"
+ICON_CACHE = cache_dir() / "flatsea" / "icons"
 _textures: dict[str, Gdk.Texture] = {}
 _client = httpx.Client(timeout=15.0, follow_redirects=True, headers={"User-Agent": "Flatsea-client/0.1"})
 
