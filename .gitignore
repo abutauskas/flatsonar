@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Local state
+server/.env
+*.db
+*.sqlite3
+server/data/
+.crawl-cache/
+
+# flatpak-builder
+.flatpak-builder/
+build-dir/
+repo/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
