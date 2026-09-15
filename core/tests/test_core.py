@@ -216,3 +216,55 @@ def test_escalate_with_clamav_hit():
 )
 def test_is_open_source(expr, ok):
     assert is_open_source(expr) is ok
+
+
+# --- metadata keyfile ----------------------------------------------------------------
+
+GIMP_METADATA = """[Application]
+name=org.gimp.GIMP
+runtime=org.gnome.Platform/x86_64/47
+sdk=org.gnome.Sdk/x86_64/47
+command=gimp
+
+[Context]
+shared=ipc;network;
+sockets=fallback-x11;wayland;
+devices=all;
+filesystems=xdg-config/GIMP:create;host;!xdg-run/gvfs;
+features=devel;
+persistent=.;
+
+[Session Bus Policy]
+org.gtk.vfs.*=talk
+org.mpris.MediaPlayer2.gimp=own
+org.evil.Thing=none
+
+[System Bus Policy]
+org.freedesktop.login1=talk
+
+[Environment]
+GTK_MODULES=
+FOO=bar
+
+[Extension org.gimp.GIMP.Plugin]
+directory=extensions
+"""
+
+
+def test_metadata_to_finish_args():
+    from flatsea_core import metadata_app_id, metadata_to_finish_args, score_finish_args
+
+    args = metadata_to_finish_args(GIMP_METADATA)
+    assert "--filesystem=host" in args
+    assert "--nofilesystem=xdg-run/gvfs" in args
+    assert "--device=all" in args
+    assert "--allow=devel" in args
+    assert "--persist=." in args
+    assert "--talk-name=org.gtk.vfs.*" in args
+    assert "--own-name=org.mpris.MediaPlayer2.gimp" in args
+    assert "--no-talk-name=org.evil.Thing" in args
+    assert "--system-talk-name=org.freedesktop.login1" in args
+    assert "--env=FOO=bar" in args
+    assert metadata_app_id(GIMP_METADATA) == "org.gimp.GIMP"
+    assert score_finish_args(args, "org.gimp.GIMP").level == RiskLevel.RED
+    assert metadata_to_finish_args("garbage [[[") == []

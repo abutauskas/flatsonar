@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.abutauskas.Flatsea</id>
+  <name>Flatsea</name>
+  <summary>Open-source Flatpak apps, hunted from everywhere</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="io.github.abutauskas"><name>abutauskas</name></developer>
+  <description>
+    <p>
+      Flatsea is F-Droid for Linux. It finds open-source Flatpak apps wherever they live:
+      Flathub, GitHub, GitLab, Codeberg, project-hosted remotes and release bundles,
+      and puts them in one store. Every listing credits the original creators and
+      shows a sponsor button.
+    </p>
+    <p>
+      You can install anything. Flatsea reads each app's sandbox permissions and runs
+      a local ClamAV scan before deploying. If something looks dangerous it warns you
+      and asks you to press Sure twice. After that, it's your call.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.abutauskas.Flatsea.desktop</launchable>
+  <url type="homepage">https://github.com/abutauskas/flatsea</url>
+  <url type="bugtracker">https://github.com/abutauskas/flatsea/issues</url>
+  <url type="vcs-browser">https://github.com/abutauskas/flatsea</url>
+  <content_rating type="oars-1.1"/>
+  <requires><display_length compare="ge">640</display_length></requires>
+  <supports><control>keyboard</control><control>pointing</control><control>touch</control></supports>
+  <releases>
+    <release version="0.1.0" date="2026-09-15"><description><p>First hunt.</p></description></release>
+  </releases>
+</component>

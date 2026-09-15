@@ -41,7 +41,50 @@ FLATSEA_API=http://localhost:8000 python -m flatsea
 ```
 
 On Windows the server can stay on the Windows side; WSL2 reaches it at
-`http://localhost:8000` automatically.
+`http://localhost:8000` automatically. Flatpak works inside WSL2 for development
+(GUI apps show up through WSLg), but test on a real Linux install before trusting
+anything sandbox-related.
+
+### Tests
+
+```sh
+pytest core/tests server/tests client/tests
+```
+
+The client's install pipeline (pull -> inspect -> ClamAV -> warn twice -> deploy) is
+tested with fakes, so the whole suite runs on Windows without GTK or flatpak.
+
+## How the warning works
+
+1. `flatpak install --no-deploy` pulls the app into the local OSTree repo without deploying it.
+2. `ostree checkout` materialises the files; ClamAV scans them.
+3. The deployed `metadata` file is parsed back into `finish-args` and scored with
+   `flatsea_core.risk` (host filesystem, `--device=all`, session/system bus, sandbox
+   escape via `org.freedesktop.Flatpak`, `LD_PRELOAD`, credential paths ... -> red;
+   X11, home folder, keyring, ... -> yellow). The index's score is only a preview; the
+   real files decide.
+4. Yellow or red: dialog one lists the findings, dialog two says it's on you.
+   Two "Sure"s and it deploys. Accepted findings are remembered per app until
+   its permissions change.
+
+Flatsea packaged as a Flatpak scores **red** by its own rules: a store has to talk to
+`org.freedesktop.Flatpak` to install things on the host. That is the honest answer.
+
+## Hunting
+
+`python -m flatsea_server.crawler.run --source all` walks:
+
+- **Flathub** - API v2 for metadata and the *deployed* permissions, plus the
+  `github.com/flathub/<id>` manifest for `sources` (that's where the upstream repo and
+  creator credit come from).
+- **GitHub / GitLab / Codeberg** - repos with the `flatpak` topic (and GitHub code search
+  with a token) whose tree contains a `reverse.dns.Name.{json,yml,yaml}` manifest.
+  `.metainfo.xml` gives name/summary/license/screenshots, `FUNDING.yml` and AppStream
+  `<url type="donation">` give the sponsor buttons, release assets ending in `.flatpak`
+  become one-click bundle installs, `.flatpakrepo` files become remotes, and anything
+  with only a manifest gets built locally with `flatpak-builder`.
+
+Only OSI/FSF-approved SPDX licenses are listed. Proprietary apps on Flathub are skipped.
 
 ## License
 
