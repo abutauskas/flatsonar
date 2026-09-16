@@ -24,6 +24,7 @@ from ..models import SourceKind
 from . import funding
 from .base import Candidate, CrawlContext, SourceSpec
 from .credit import developer_from, normalise_repo_url
+from .trust import assess
 
 log = logging.getLogger("flatsonar.crawler.flathub")
 
@@ -160,6 +161,8 @@ class FlathubSource:
             async with sem:
                 try:
                     cand = await self.one(ctx, app_id)
+                    if cand is not None:
+                        await assess(ctx, cand)
                 except Exception as exc:  # keep the crawl going
                     log.warning("flathub %s: %s", app_id, exc)
                     cand = None

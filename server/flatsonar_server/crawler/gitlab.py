@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from urllib.parse import quote
 
 from .base import Candidate, CrawlContext
-from .forge import RepoInfo, candidates_from_repo
+from .forge import RepoInfo, candidates_from_repo, parse_timestamp
 
 log = logging.getLogger("flatsonar.crawler.gitlab")
 
@@ -36,6 +36,9 @@ class GitLabForge:
             default_branch=p.get("default_branch") or "main",
             description=p.get("description"),
             stars=int(p.get("star_count") or 0),
+            forks=int(p.get("forks_count") or 0),
+            created_at=parse_timestamp(p.get("created_at")),
+            pushed_at=parse_timestamp(p.get("last_activity_at")),
             license_spdx=None,  # needs a per-project call; the metainfo usually has it
             archived=bool(p.get("archived")),
             fork=bool(p.get("forked_from_project")),

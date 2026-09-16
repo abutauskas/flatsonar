@@ -11,6 +11,22 @@ RISK_ICON = {"green": "security-high-symbolic", "yellow": "security-medium-symbo
 RISK_CSS = {"green": "success", "yellow": "warning", "red": "error"}
 RISK_TEXT = {"green": "Sandboxed", "yellow": "Broad permissions", "red": "Dangerous permissions"}
 
+# Publisher trust, from the server's provenance checks. Never let unverified look verified.
+TRUST_TEXT = {"verified": "Verified creator", "reviewed": "Flathub reviewed", "unverified": "Unverified publisher",
+              "suspicious": "Suspicious publisher"}
+TRUST_STYLE = {"verified": "green", "reviewed": "accent", "unverified": "yellow", "suspicious": "red"}
+TRUST_ICON = {"verified": "emblem-ok-symbolic", "reviewed": "emblem-documents-symbolic",
+              "unverified": "dialog-question-symbolic", "suspicious": "dialog-warning-symbolic"}
+TRUST_TIP = {
+    "verified": "The creator demonstrably controls this app id (Flathub verification, the hosting account owns "
+                "the namespace, or a well-known file on their domain).",
+    "reviewed": "On Flathub: the manifest was reviewed and the build ran on Flathub's infrastructure, "
+                "but the developer has not verified ownership of the app id.",
+    "unverified": "Nobody has confirmed that the publisher controls this app id. You'll be warned before installing.",
+    "suspicious": "Something concrete is wrong: the app id claims a namespace this repository does not own, "
+                  "or the build does things a build should not. You'll be warned twice.",
+}
+
 CSS = """
 .app-card { border-radius: 12px; padding: 12px; }
 .app-card:hover { background: alpha(currentColor, 0.06); }
@@ -19,6 +35,7 @@ CSS = """
 .risk-pill.green { background: alpha(@success_color, 0.18); color: @success_color; }
 .risk-pill.yellow { background: alpha(@warning_color, 0.18); color: @warning_color; }
 .risk-pill.red { background: alpha(@error_color, 0.18); color: @error_color; }
+.risk-pill.accent { background: alpha(@accent_bg_color, 0.18); color: @accent_color; }
 .hero-icon { border-radius: 24px; }
 .sponsor { background: alpha(@accent_bg_color, 0.15); color: @accent_color; }
 .status-bar { padding: 6px 12px; }
@@ -36,6 +53,16 @@ def risk_pill(level: str) -> Gtk.Widget:
         "yellow": "Asks for permissions that weaken the sandbox. You'll be warned before installing.",
         "red": "Asks for permissions that effectively escape the sandbox. You'll be warned twice.",
     }.get(level, ""))
+    return pill
+
+
+def trust_pill(level: str) -> Gtk.Widget:
+    pill = Gtk.Box(spacing=4, valign=Gtk.Align.CENTER)
+    pill.add_css_class("risk-pill")
+    pill.add_css_class(TRUST_STYLE.get(level, "yellow"))
+    pill.append(Gtk.Image.new_from_icon_name(TRUST_ICON.get(level, "dialog-question-symbolic")))
+    pill.append(Gtk.Label(label=TRUST_TEXT.get(level, level)))
+    pill.set_tooltip_text(TRUST_TIP.get(level, ""))
     return pill
 
 
@@ -74,24 +101,33 @@ class AppCard(Gtk.Button):
             heart.set_tooltip_text("Has a sponsor link")
             heart.add_css_class("accent")
             foot.append(heart)
-        if app.flathub_verified:
-            check = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-            check.set_tooltip_text("Verified on Flathub")
-            check.add_css_class("success")
-            foot.append(check)
+        if app.trust != "reviewed":  # the common Flathub case stays quiet; everything else gets a mark
+            mark = Gtk.Image.new_from_icon_name(TRUST_ICON.get(app.trust, "dialog-question-symbolic"))
+            mark.set_tooltip_text(TRUST_TEXT.get(app.trust, app.trust))
+            mark.add_css_class({"green": "success", "yellow": "warning", "red": "error"}.get(
+                TRUST_STYLE.get(app.trust, "yellow"), "warning"))
+            foot.append(mark)
         box.append(foot)
         self.set_child(box)
 
 
-def permission_row(perm: dict[str, str]) -> Adw.ActionRow:
-    row = Adw.ActionRow(title=perm["reason"], subtitle=perm["arg"])
-    row.set_title_lines(2)
+def finding_row(reason: str, detail: str, level: str) -> Adw.ActionRow:
+    row = Adw.ActionRow(title=reason, subtitle=detail)
+    row.set_title_lines(3)
     icon = Gtk.Image.new_from_icon_name({
         "green": "emblem-ok-symbolic", "yellow": "dialog-warning-symbolic", "red": "dialog-error-symbolic",
-    }[perm["level"]])
-    icon.add_css_class(RISK_CSS[perm["level"]])
+    }.get(level, "dialog-warning-symbolic"))
+    icon.add_css_class(RISK_CSS.get(level, "warning"))
     row.add_prefix(icon)
     return row
+
+
+def permission_row(perm: dict[str, str]) -> Adw.ActionRow:
+    return finding_row(perm["reason"], perm["arg"], perm["level"])
+
+
+def trust_row(finding: dict[str, str]) -> Adw.ActionRow:
+    return finding_row(finding["reason"], finding["check"], finding["level"])
 
 
 def sponsor_button(link: dict[str, str]) -> Gtk.Button:

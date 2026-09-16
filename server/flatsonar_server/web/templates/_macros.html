@@ -1,0 +1,40 @@
+{% macro icon(app, size=56) -%}
+<img class="icon" src="{{ app.icon_url or '/static/app-fallback.svg' }}" width="{{ size }}" height="{{ size }}" alt=""
+     loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/static/app-fallback.svg'">
+{%- endmacro %}
+
+{% macro risk_pill(level) -%}
+<span class="pill {{ level }}" title="{{ RISK_TIP.get(level, '') }}"><span class="dot"></span>{{ RISK_TEXT.get(level, level) }}</span>
+{%- endmacro %}
+
+{% macro trust_pill(level) -%}
+{% set style = {'verified': 'green', 'reviewed': 'blue', 'unverified': 'yellow', 'suspicious': 'red'}.get(level, 'yellow') %}
+<span class="pill {{ style }}" title="{{ TRUST_TIP.get(level, '') }}">
+  {% if level == 'verified' %}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  {% elif level == 'suspicious' %}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2l6.5 11.5h-13z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 6.5v3M8 11.6v.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  {% else %}<span class="dot"></span>{% endif %}
+  {{ TRUST_TEXT.get(level, level) }}
+</span>
+{%- endmacro %}
+
+{% macro app_card(app) -%}
+<a class="app-card" href="/apps/{{ app.app_id }}">
+  {{ icon(app) }}
+  <div class="meta">
+    <div class="name">{{ app.name }}</div>
+    {% if app.developer_name %}<div class="dev">by {{ app.developer_name }}</div>{% endif %}
+    <div class="summary">{{ app.summary }}</div>
+    <div class="pills">
+      {{ risk_pill(app.risk_level) }}
+      {% if app.trust != 'reviewed' %}{{ trust_pill(app.trust) }}{% endif %}
+      {% if app.sponsor_links %}<span class="pill heart" title="Has a sponsor link"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg>Sponsor</span>{% endif %}
+    </div>
+  </div>
+</a>
+{%- endmacro %}
+
+{% macro app_grid(apps) -%}
+<div class="app-grid">
+  {% for app in apps %}{{ app_card(app) }}{% endfor %}
+</div>
+{%- endmacro %}

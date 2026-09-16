@@ -62,6 +62,12 @@ class RiskReport:
             self.level = level
         return self
 
+    def extend(self, findings: Iterable[Finding]) -> "RiskReport":
+        """Merge findings from another check (manifest audit, publisher trust)."""
+        for f in findings:
+            self.escalate(f.level, f.arg, f.reason)
+        return self
+
 
 # --- filesystem -------------------------------------------------------------
 

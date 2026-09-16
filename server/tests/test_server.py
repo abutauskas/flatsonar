@@ -103,6 +103,11 @@ def test_api_list_search_detail(client, session):
     assert client.get("/api/apps?q=nothing").json()["total"] == 0
     assert client.get("/api/apps?category=Utility").json()["total"] == 1
     assert client.get("/api/apps?risk=red").json()["total"] == 0
+    # The client's Installed page asks for exactly the ids it has on disk.
+    by_ids = client.get("/api/apps?ids=org.gnome.Calculator,nope.nope.Nope,%20").json()
+    assert [i["app_id"] for i in by_ids["items"]] == ["org.gnome.Calculator"]
+    assert "latest_version" in by_ids["items"][0]
+    assert client.get("/api/apps?ids=").json()["total"] == 0
 
     d = client.get("/api/apps/org.gnome.Calculator").json()
     assert d["developer_name"] == "The GNOME Project"

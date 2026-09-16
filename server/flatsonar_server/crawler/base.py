@@ -10,16 +10,18 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator
+from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from flatsonar_core import Manifest, is_open_source, score_finish_args
+from flatsonar_core import Finding, Manifest, RiskLevel, TrustLevel, is_open_source, score_finish_args
+from flatsonar_core.provenance import same_repo
 
 from ..models import App, InstallSource, ManifestRecord, SourceKind
 from ..settings import settings
@@ -188,11 +190,25 @@ class Candidate:
     sponsor_links: list[dict[str, str]] | None = None
     latest_version: str | None = None
     stars: int | None = None
+    forks: int | None = None
+    repo_created_at: datetime | None = None
+    repo_pushed_at: datetime | None = None
     on_flathub: bool | None = None
     flathub_verified: bool | None = None
     manifest: Manifest | None = None
     manifest_url: str | None = None
     sources: list[SourceSpec] = field(default_factory=list)
+    # Filled by crawler.trust.assess(); None means "not assessed" and the row keeps what it had.
+    trust: TrustLevel | None = None
+    trust_findings: list[Finding] = field(default_factory=list)
+
+    @property
+    def trust_level(self) -> TrustLevel:
+        return self.trust if self.trust is not None else TrustLevel.UNVERIFIED
+
+
+class Skipped(Exception):
+    """The candidate was deliberately not written (id collision with a different upstream)."""
 
 
 class Source(Protocol):
@@ -204,24 +220,87 @@ class Source(Protocol):
 # --- upsert ------------------------------------------------------------------
 
 
+def _finding_dict(f: Finding) -> dict[str, str]:
+    return {"check": f.arg, "level": f.level.label, "reason": f.reason}
+
+
+def _add_trust_finding(app: App, f: Finding) -> None:
+    d = _finding_dict(f)
+    if d not in (app.trust_findings or []):
+        app.trust_findings = [*(app.trust_findings or []), d]
+
+
+def _lookalike_findings(db: Session, cand: Candidate) -> list[Finding]:
+    """An off-Flathub app that shares its *name* with a Flathub app but comes from a
+    different repository is worth a note on the card. Names collide innocently all
+    the time ("Calculator"), so this is a yellow note, not a verdict."""
+    if cand.on_flathub or not cand.name:
+        return []
+    twins = db.scalars(
+        select(App).where(App.on_flathub.is_(True), App.app_id != cand.app_id,
+                          func.lower(App.name) == cand.name.strip().lower())
+    ).all()
+    out = []
+    for twin in twins:
+        if twin.upstream_url and same_repo(twin.upstream_url, cand.upstream_url):
+            continue  # same project, different id (a Devel build, a rename)
+        out.append(Finding("publisher:lookalike", RiskLevel.YELLOW,
+                           f"same name as {twin.app_id} on Flathub but from a different repository"))
+    return out
+
+
+def _guard_collision(db: Session, app: App, cand: Candidate) -> None:
+    """Two publishers, one app id. Decide who keeps the row.
+
+    * Flathub always keeps it; a forge candidate may only enrich, and only when it is
+      the same repository Flathub builds from (else an impostor could plant sponsor links).
+    * Otherwise the candidate takes over only if it is strictly more trusted (e.g. the
+      real ``io.github.alice`` repo turning up after a copy). Equal trust: first seen wins,
+      the incumbent gets a note that someone else publishes the same id.
+    """
+    if not app.upstream_url or not cand.upstream_url or same_repo(app.upstream_url, cand.upstream_url):
+        return
+    incumbent = TrustLevel.from_label(app.trust or "unverified")
+    if app.on_flathub and not cand.on_flathub:
+        raise Skipped(f"{cand.app_id}: {cand.upstream_url} is not the repo Flathub builds ({app.upstream_url})")
+    if cand.trust_level > incumbent and not app.on_flathub:
+        log.info("%s: %s (%s) takes over from %s (%s)", cand.app_id, cand.upstream_url, cand.trust_level.label,
+                 app.upstream_url, incumbent.label)
+        for row in db.scalars(select(InstallSource).where(InstallSource.app_id == app.app_id)):
+            db.delete(row)
+        app.sponsor_links = []
+        app.trust_findings = []
+        db.flush()
+        return
+    _add_trust_finding(app, Finding("publisher:collision", RiskLevel.YELLOW,
+                                    f"{cand.upstream_url} also publishes this app id"))
+    raise Skipped(f"{cand.app_id}: id already taken by {app.upstream_url} ({incumbent.label}); "
+                  f"candidate {cand.upstream_url} ({cand.trust_level.label}) skipped")
+
+
 def upsert_candidate(db: Session, cand: Candidate) -> tuple[App, bool]:
-    """Write a candidate into the DB. Returns (app, created)."""
+    """Write a candidate into the DB. Returns (app, created). Raises :class:`Skipped`
+    when a different publisher already owns the app id."""
     app = db.get(App, cand.app_id)
     created = app is None
     if created:
         app = App(app_id=cand.app_id, name=cand.name or cand.app_id)
         db.add(app)
-    elif app.on_flathub and not cand.on_flathub:
+    else:
+        _guard_collision(db, app, cand)
+    if not created and app.on_flathub and not cand.on_flathub:
         # A forge crawl found the upstream repo of an app Flathub already ships.
         # Flathub's data and permissions are authoritative; only take what it lacks.
         if cand.stars is not None:
             app.stars = max(app.stars or 0, cand.stars)
+        if cand.forks is not None:
+            app.forks = max(app.forks or 0, cand.forks)
         if cand.sponsor_links:
             merged = {(l["platform"], l["url"]): l for l in (app.sponsor_links or [])}
             for l in cand.sponsor_links:
                 merged.setdefault((l["platform"], l["url"]), l)
             app.sponsor_links = list(merged.values())
-        for attr in ("upstream_url", "homepage", "developer_name", "icon_url"):
+        for attr in ("upstream_url", "homepage", "developer_name", "icon_url", "repo_created_at", "repo_pushed_at"):
             if not getattr(app, attr) and getattr(cand, attr):
                 setattr(app, attr, getattr(cand, attr))
         return app, False
@@ -229,6 +308,7 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App, bool]:
     for attr in (
         "name", "summary", "description", "icon_url", "screenshots", "categories", "license",
         "developer_name", "upstream_url", "homepage", "latest_version", "on_flathub", "flathub_verified",
+        "repo_created_at", "repo_pushed_at",
     ):
         val = getattr(cand, attr)
         if val is not None and val != "" and val != []:
@@ -236,6 +316,15 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App, bool]:
 
     if cand.stars is not None:
         app.stars = max(app.stars or 0, cand.stars)
+    if cand.forks is not None:
+        app.forks = max(app.forks or 0, cand.forks)
+
+    if cand.trust is not None:
+        findings = [*cand.trust_findings, *_lookalike_findings(db, cand)]
+        # Keep collision notes the incumbent collected; they describe the id, not this crawl.
+        kept = [d for d in (app.trust_findings or []) if d.get("check") == "publisher:collision"]
+        app.trust = cand.trust.label
+        app.trust_findings = [*kept, *(_finding_dict(f) for f in findings)]
 
     if cand.sponsor_links:
         merged = {(l["platform"], l["url"]): l for l in (app.sponsor_links or [])}

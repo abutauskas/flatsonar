@@ -18,6 +18,16 @@ class Permission(BaseModel):
     reason: str
 
 
+class TrustFinding(BaseModel):
+    """Why the publisher got the trust level it has: namespace check, repo age,
+    manifest audit, id collisions. ``level`` uses the same green/yellow/red scale
+    as permissions; the client lists non-green ones before installing."""
+
+    check: str
+    level: str
+    reason: str
+
+
 class InstallSourceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -44,7 +54,9 @@ class AppSummary(BaseModel):
     risk_level: str
     on_flathub: bool
     flathub_verified: bool
+    trust: str  # verified | reviewed | unverified | suspicious
     stars: int
+    latest_version: str | None = None
     has_sponsor: bool = False
 
 
@@ -56,7 +68,10 @@ class AppDetail(AppSummary):
     sponsor_links: list[SponsorLink]
     risk_reasons: list[str]
     permissions: list[Permission]
-    latest_version: str | None
+    trust_findings: list[TrustFinding]
+    forks: int
+    repo_created_at: datetime | None
+    repo_pushed_at: datetime | None
     is_oss: bool
     first_seen: datetime
     updated_at: datetime
@@ -81,4 +96,5 @@ class Stats(BaseModel):
     off_flathub: int
     with_sponsor: int
     by_risk: dict[str, int]
+    by_trust: dict[str, int]
     last_crawls: list[dict]

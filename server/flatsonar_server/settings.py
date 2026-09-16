@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     codeberg_token: str | None = None
     crawl_cache_dir: Path = _SERVER_DIR / ".crawl-cache"
     cors_origins: str = "*"
+    site_url: str | None = None  # public origin for sitemap/feed links, e.g. https://flatsonar.org
     user_agent: str = "Flatsonar/0.1 (+https://github.com/abutauskas/flatsonar)"
 
 

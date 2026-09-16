@@ -49,8 +49,16 @@ class App(Base):
 
     latest_version: Mapped[str | None] = mapped_column(String(64))
     stars: Mapped[int] = mapped_column(Integer, default=0)
+    forks: Mapped[int] = mapped_column(Integer, default=0)
+    repo_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    repo_pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     on_flathub: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     flathub_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Publisher trust (see flatsonar_core.provenance): verified / reviewed / unverified / suspicious,
+    # plus the findings that led there (namespace check, repo age, manifest audit, collisions).
+    trust: Mapped[str] = mapped_column(String(12), default="unverified", index=True)
+    trust_findings: Mapped[list[dict]] = mapped_column(JSON, default=list)  # [{check, level, reason}]
 
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

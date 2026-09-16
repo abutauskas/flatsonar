@@ -25,17 +25,25 @@ def main(argv: list[str] | None = None) -> int:
     from .api import DEFAULT_API, FlatsonarAPI
     from .window import FlatsonarWindow
 
+    fake = os.environ.get("FLATSONAR_FAKE_FLATPAK", "").strip().lower()
+    if fake and fake not in ("0", "no", "false"):
+        # No flatpak on this machine (Windows/MSYS2 preview): simulate one.
+        from .install import fake_flatpak
+
+        fake_flatpak.activate(reset=fake == "reset")
+
     class FlatsonarApp(Adw.Application):
         def __init__(self):
             super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
             self.window: FlatsonarWindow | None = None
             for name, cb in (("refresh", self._refresh), ("forget", self._forget), ("about", self._about),
-                             ("quit", lambda *_: self.quit())):
+                             ("installed", self._installed), ("quit", lambda *_: self.quit())):
                 action = Gio.SimpleAction.new(name, None)
                 action.connect("activate", cb)
                 self.add_action(action)
             self.set_accels_for_action("app.quit", ["<primary>q"])
             self.set_accels_for_action("app.refresh", ["<primary>r"])
+            self.set_accels_for_action("app.installed", ["<primary>i"])
 
         def do_activate(self):
             if self.window is None:
@@ -47,6 +55,10 @@ def main(argv: list[str] | None = None) -> int:
                 self.window.load_categories()
                 self.window.reload()
                 self.window.refresh_installed()
+
+        def _installed(self, *_):
+            if self.window:
+                self.window.show_installed()
 
         def _forget(self, *_):
             if self.window:

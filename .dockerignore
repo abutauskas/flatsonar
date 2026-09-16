@@ -1,0 +1,10 @@
+.git
+.venv
+**/__pycache__
+**/*.egg-info
+**/.pytest_cache
+server/.env
+server/*.db*
+server/.crawl-cache
+client
+scripts

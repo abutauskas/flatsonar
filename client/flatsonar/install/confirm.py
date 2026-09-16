@@ -15,6 +15,10 @@ _HEADINGS = {
     RiskLevel.YELLOW: "This app asks for a lot",
     RiskLevel.RED: "This app looks dangerous",
 }
+_PUBLISHER_HEADINGS = {
+    RiskLevel.YELLOW: "Flatsonar can't vouch for this publisher",
+    RiskLevel.RED: "This publisher looks wrong",
+}
 
 
 def _reasons_box(report: RiskReport) -> Gtk.Widget:
@@ -49,17 +53,24 @@ class DialogConfirmer:
 
         return bool(ask_on_main(present))
 
-    def warn_and_confirm(self, app: AppInfo, report: RiskReport, scan_result: ScanResult) -> bool:
-        heading = _HEADINGS.get(report.level, "Heads up")
-        if scan_result.infected:
+    def warn_and_confirm(self, app: AppInfo, report: RiskReport, scan_result: ScanResult | None) -> bool:
+        worst = max((f for f in report.findings if f.level > RiskLevel.GREEN), key=lambda f: f.level, default=None)
+        # Sandbox findings are finish-args ("--filesystem=host"); everything else is about
+        # the publisher, the manifest or the build.
+        about_publisher = worst is not None and not worst.arg.startswith("--") and worst.arg != "clamav"
+        heading = (_PUBLISHER_HEADINGS if about_publisher else _HEADINGS).get(report.level, "Heads up")
+        if scan_result and scan_result.infected:
             heading = "ClamAV found malware"
         body_bits = []
-        if scan_result.infected:
+        if scan_result is None:
+            body_bits.append(f"Nothing has been downloaded or built yet. The concerns below come from who "
+                             f"publishes {app.name} and what its manifest does.")
+        elif scan_result.infected:
             body_bits.append(f"ClamAV flagged {len(scan_result.infected)} file(s) in {app.name}.")
         elif scan_result.ran:
-            body_bits.append("ClamAV found nothing, but the sandbox permissions below are broad.")
+            body_bits.append("ClamAV found nothing, but see below.")
         else:
-            body_bits.append("ClamAV is not installed, so only the sandbox permissions were checked.")
+            body_bits.append("ClamAV is not installed, so the files themselves were not scanned.")
         body_bits.append("Flatsonar recommends not installing this. You can, but it's your call.")
         dialog = Adw.AlertDialog(heading=heading, body=" ".join(body_bits))
         dialog.set_extra_child(_reasons_box(report))

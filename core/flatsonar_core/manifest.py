@@ -34,6 +34,18 @@ class ManifestSource:
     tag: str | None = None
     commit: str | None = None
     branch: str | None = None
+    checksum: str | None = None  # sha256 / sha512 / sha1 / md5, whichever was given
+    commands: tuple[str, ...] = ()  # shell / script sources
+    dest_filename: str | None = None
+
+    @property
+    def pinned(self) -> bool:
+        """Can the bytes this source fetches change without the manifest changing?"""
+        if self.kind == "git":
+            return bool(self.commit or self.tag)
+        if self.kind in ("archive", "file", "extra-data"):
+            return bool(self.checksum) or not self.url  # no url: a file next to the manifest
+        return True  # inline, patch, dir, shell, script: content is in the manifest / repo
 
 
 @dataclass
@@ -114,8 +126,13 @@ def _parse_sources(module: dict[str, Any]) -> list[ManifestSource]:
             v = s.get(key)
             return None if v is None else str(v)
 
-        out.append(ManifestSource(kind=_s("type") or "", url=_s("url"), tag=_s("tag"),
-                                  commit=_s("commit"), branch=_s("branch")))
+        checksum = next((_s(k) for k in ("sha256", "sha512", "sha1", "md5") if s.get(k)), None)
+        cmds = s.get("commands") or []
+        out.append(ManifestSource(
+            kind=_s("type") or "", url=_s("url"), tag=_s("tag"), commit=_s("commit"), branch=_s("branch"),
+            checksum=checksum, commands=tuple(str(c) for c in cmds) if isinstance(cmds, list) else (),
+            dest_filename=_s("dest-filename"),
+        ))
     return out
 
 

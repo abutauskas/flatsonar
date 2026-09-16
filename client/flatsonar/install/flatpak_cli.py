@@ -11,15 +11,19 @@ import os
 import shutil
 import subprocess
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..paths import cache_dir, data_dir
 
 log = logging.getLogger("flatsonar.flatpak")
 
-FLATPAK_USER_REPO = data_dir() / "flatpak/repo"
+FLATPAK_USER_ROOT = data_dir() / "flatpak"
+FLATPAK_SYSTEM_ROOT = Path("/var/lib/flatpak")
+FLATPAK_USER_REPO = FLATPAK_USER_ROOT / "repo"
 CACHE = cache_dir() / "flatsonar"
 LOCAL_REMOTE = "flatsonar-local"  # where locally built (manifest-only) apps are exported
+INSTALLATIONS = ("user", "system")
 
 # When Flatsonar itself runs as a Flatpak, host commands go through the portal.
 IN_SANDBOX = Path("/.flatpak-info").exists()
@@ -63,12 +67,89 @@ def default_arch() -> str:
         return "x86_64"
 
 
-def installed_ids() -> set[str]:
+@dataclass
+class InstalledApp:
+    """One row of ``flatpak list``. ``installation`` is ``user`` or ``system`` (or a named
+    system installation); ``origin`` is the remote it came from, ``flatsonar-local`` for
+    apps Flatsonar built from a manifest, and empty for bundles."""
+
+    app_id: str
+    version: str = ""
+    origin: str = ""
+    installation: str = "user"
+    ref: str = ""
+    name: str = ""
+
+    @property
+    def locally_built(self) -> bool:
+        return self.origin == LOCAL_REMOTE
+
+
+_LIST_COLUMNS = "application,version,origin,installation,ref,name"
+
+
+def parse_installed(text: str) -> list[InstalledApp]:
+    """``flatpak list --columns=...`` prints tab-separated rows when not on a terminal."""
+    out: list[InstalledApp] = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        cols = line.split("\t")
+        cols += [""] * (6 - len(cols))
+        app_id, version, origin, installation, ref, name = (c.strip() for c in cols[:6])
+        if not app_id:
+            continue
+        out.append(InstalledApp(app_id, version, origin, installation or "user", ref, name))
+    return out
+
+
+def installed_apps() -> list[InstalledApp]:
+    """Every installed app, user *and* system. Distros install Flathub apps system-wide by
+    default, so listing only ``--user`` would offer to install things already there."""
     try:
-        out = _run(["flatpak", "list", "--user", "--app", "--columns=application"])
+        out = _run(["flatpak", "list", "--app", f"--columns={_LIST_COLUMNS}"])
     except (FlatpakError, OSError):
-        return set()
-    return {l.strip() for l in out.splitlines() if l.strip()}
+        return []
+    return parse_installed(out)
+
+
+def installed_ids() -> set[str]:
+    return {a.app_id for a in installed_apps()}
+
+
+def _installation_flag(installation: str) -> str:
+    return f"--{installation}" if installation in INSTALLATIONS else f"--installation={installation}"
+
+
+def repo_for(installation: str) -> Path:
+    return FLATPAK_USER_REPO if installation == "user" else FLATPAK_SYSTEM_ROOT / "repo"
+
+
+def deployed_metadata(app_id: str, installation: str = "user") -> str | None:
+    """The ``metadata`` keyfile of the *deployed* app: what its sandbox allows right now."""
+    root = FLATPAK_USER_ROOT if installation == "user" else FLATPAK_SYSTEM_ROOT
+    p = root / "app" / app_id / "current" / "active" / "metadata"
+    try:
+        return p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        pass
+    try:  # inside our own sandbox the host paths are not mounted; ask flatpak instead
+        return _run(["flatpak", "info", "--show-metadata", _installation_flag(installation), app_id]) or None
+    except (FlatpakError, OSError):
+        return None
+
+
+def updates_available() -> set[str]:
+    """App ids whose remote has a newer commit than what is deployed. Talks to the network;
+    a failure (offline, no polkit for system remotes) just means "none known"."""
+    ids: set[str] = set()
+    for installation in INSTALLATIONS:
+        try:
+            out = _run(["flatpak", "remote-ls", "--updates", "--app", f"--{installation}", "--columns=application"])
+        except (FlatpakError, OSError):
+            continue
+        ids.update(l.strip() for l in out.splitlines() if l.strip())
+    return ids
 
 
 def ensure_remote(name: str, url: str, gpg_verify: bool = True) -> None:
@@ -96,8 +177,18 @@ def deploy_bundle(path: Path, on_line=None) -> None:
     _run(["flatpak", "install", "--user", "--noninteractive", "--reinstall", str(path)], on_line)
 
 
-def uninstall(app_id: str, on_line=None) -> None:
-    _run(["flatpak", "uninstall", "--user", "--noninteractive", app_id], on_line)
+def uninstall(app_id: str, on_line=None, installation: str = "user") -> None:
+    _run(["flatpak", "uninstall", _installation_flag(installation), "--noninteractive", app_id], on_line)
+
+
+def pull_update(app_id: str, installation: str = "user", on_line=None) -> None:
+    """Fetch the new commit into the local repo without deploying it, so it can be
+    checked out, scanned and re-scored first (same trick as :func:`pull`)."""
+    _run(["flatpak", "update", _installation_flag(installation), "--noninteractive", "--no-deploy", app_id], on_line)
+
+
+def deploy_update(app_id: str, installation: str = "user", on_line=None) -> None:
+    _run(["flatpak", "update", _installation_flag(installation), "--noninteractive", app_id], on_line)
 
 
 def launch(app_id: str) -> None:

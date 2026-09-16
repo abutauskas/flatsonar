@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator
 from urllib.parse import quote
 
 from .base import Candidate, CrawlContext
-from .forge import RepoInfo, candidates_from_repo
+from .forge import RepoInfo, candidates_from_repo, parse_timestamp
 
 log = logging.getLogger("flatsonar.crawler.github")
 
@@ -54,6 +54,9 @@ class GitHubForge:
             description=r.get("description"),
             homepage=r.get("homepage") or None,
             stars=int(r.get("stargazers_count") or 0),
+            forks=int(r.get("forks_count") or 0),
+            created_at=parse_timestamp(r.get("created_at")),
+            pushed_at=parse_timestamp(r.get("pushed_at")),
             license_spdx=None if lic in (None, "NOASSERTION") else lic,
             archived=bool(r.get("archived")),
             fork=bool(r.get("fork")),

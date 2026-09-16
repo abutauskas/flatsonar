@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Not found — {{ site.name }}{% endblock %}
+{% block content %}
+<div class="wrap notfound">
+  <p class="kicker">404</p>
+  <h1>Nothing on the sonar.</h1>
+  <p class="lede">{{ what }}.</p>
+  <form class="hero-search" action="/apps" role="search">
+    <label class="visually-hidden" for="nfq">Search apps</label>
+    <input id="nfq" type="search" name="q" placeholder="Search apps" autocomplete="off">
+    <button class="btn primary" type="submit">Search</button>
+  </form>
+  <p><a href="/apps">Browse all apps</a> or <a href="/">go home</a>.</p>
+</div>
+{% endblock %}

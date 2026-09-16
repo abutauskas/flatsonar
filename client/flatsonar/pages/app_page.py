@@ -8,7 +8,8 @@ from gi.repository import Adw, Gtk
 
 from ..api import AppInfo
 from ..icons import load_into
-from ..widgets import permission_row, risk_pill, sponsor_button
+from ..install.flatpak_cli import InstalledApp
+from ..widgets import TRUST_TIP, permission_row, risk_pill, sponsor_button, trust_pill, trust_row
 
 SOURCE_TEXT = {
     "flathub": "Installs from Flathub",
@@ -19,12 +20,13 @@ SOURCE_TEXT = {
 
 
 class AppPage(Adw.NavigationPage):
-    def __init__(self, app: AppInfo, installed: bool,
+    def __init__(self, app: AppInfo, installed: InstalledApp | None, update: bool,
                  on_install: Callable[[AppInfo], None], on_uninstall: Callable[[AppInfo], None],
-                 on_launch: Callable[[AppInfo], None]):
+                 on_launch: Callable[[AppInfo], None], on_update: Callable[[AppInfo], None]):
         super().__init__(title=app.name, tag=f"app:{app.app_id}")
         self.app = app
         self._on_install, self._on_uninstall, self._on_launch = on_install, on_uninstall, on_launch
+        self._on_update = on_update
 
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(Adw.HeaderBar())
@@ -36,10 +38,11 @@ class AppPage(Adw.NavigationPage):
         toolbar.set_content(scroller)
         self.set_child(toolbar)
 
-        body.append(self._hero(installed))
+        body.append(self._hero(installed, update))
         if app.sponsor_links:
             body.append(self._sponsor_group())
         body.append(self._credit_group())
+        body.append(self._publisher_group())
         if app.description:
             desc = Gtk.Label(label=app.description, wrap=True, xalign=0, selectable=True)
             body.append(desc)
@@ -50,7 +53,7 @@ class AppPage(Adw.NavigationPage):
 
     # --- sections ---------------------------------------------------------------
 
-    def _hero(self, installed: bool) -> Gtk.Widget:
+    def _hero(self, installed: InstalledApp | None, update: bool) -> Gtk.Widget:
         row = Gtk.Box(spacing=18)
         icon = Gtk.Image(pixel_size=96, valign=Gtk.Align.START)
         icon.add_css_class("hero-icon")
@@ -73,12 +76,12 @@ class AppPage(Adw.NavigationPage):
             lic.add_css_class("risk-pill")
             lic.add_css_class("dim-label")
             pills.append(lic)
-        if self.app.flathub_verified:
-            v = Gtk.Label(label="Verified on Flathub")
-            v.add_css_class("risk-pill")
-            v.add_css_class("green")
-            pills.append(v)
+        pills.append(trust_pill(self.app.trust))
         col.append(pills)
+        self.version_lbl = Gtk.Label(xalign=0, wrap=True)
+        self.version_lbl.add_css_class("dim-label")
+        self.version_lbl.add_css_class("caption")
+        col.append(self.version_lbl)
         row.append(col)
 
         actions = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, valign=Gtk.Align.START)
@@ -86,6 +89,10 @@ class AppPage(Adw.NavigationPage):
         self.install_btn.add_css_class("suggested-action")
         self.install_btn.add_css_class("pill")
         self.install_btn.connect("clicked", lambda _b: self._on_install(self.app))
+        self.update_btn = Gtk.Button(label="Update")
+        self.update_btn.add_css_class("suggested-action")
+        self.update_btn.add_css_class("pill")
+        self.update_btn.connect("clicked", lambda _b: self._on_update(self.app))
         self.launch_btn = Gtk.Button(label="Open")
         self.launch_btn.add_css_class("pill")
         self.launch_btn.connect("clicked", lambda _b: self._on_launch(self.app))
@@ -94,10 +101,10 @@ class AppPage(Adw.NavigationPage):
         self.remove_btn.add_css_class("pill")
         self.remove_btn.connect("clicked", lambda _b: self._on_uninstall(self.app))
         self.spinner = Gtk.Spinner(spinning=False, visible=False)
-        for w in (self.install_btn, self.launch_btn, self.remove_btn, self.spinner):
+        for w in (self.install_btn, self.update_btn, self.launch_btn, self.remove_btn, self.spinner):
             actions.append(w)
         row.append(actions)
-        self.set_installed(installed)
+        self.set_installed(installed, update)
         return row
 
     def _sponsor_group(self) -> Gtk.Widget:
@@ -121,6 +128,18 @@ class AppPage(Adw.NavigationPage):
             row.add_suffix(Gtk.Image.new_from_icon_name("external-link-symbolic"))
             row.connect("activated", lambda _r, u=url: Gtk.UriLauncher(uri=u).launch(None, None, None))
             group.add(row)
+        return group
+
+    def _publisher_group(self) -> Gtk.Widget:
+        group = Adw.PreferencesGroup(title="Who publishes this", description=TRUST_TIP.get(self.app.trust, ""))
+        findings = self.app.trust_findings or []
+        if not findings:
+            group.add(Adw.ActionRow(title="No provenance information",
+                                    subtitle="The index has not assessed this publisher yet"))
+        for f in sorted(findings, key=lambda f: {"red": 0, "yellow": 1, "green": 2}.get(f.get("level"), 1)):
+            group.add(trust_row(f))
+        if self.app.repo_created_at:
+            group.add(Adw.ActionRow(title="Repository created", subtitle=self.app.repo_created_at[:10]))
         return group
 
     def _screenshots(self) -> Gtk.Widget:
@@ -156,13 +175,25 @@ class AppPage(Adw.NavigationPage):
 
     # --- state ------------------------------------------------------------------
 
-    def set_installed(self, installed: bool) -> None:
-        self.install_btn.set_visible(not installed)
-        self.launch_btn.set_visible(installed)
-        self.remove_btn.set_visible(installed)
+    def set_installed(self, installed: InstalledApp | None, update: bool = False) -> None:
+        self.installed = installed
+        self.install_btn.set_visible(installed is None)
+        self.update_btn.set_visible(installed is not None and update)
+        self.launch_btn.set_visible(installed is not None)
+        self.remove_btn.set_visible(installed is not None)
+        latest = self.app.latest_version
+        if installed is None:
+            text = f"Latest version {latest}" if latest else ""
+        else:
+            where = " system-wide" if installed.installation == "system" else ""
+            text = f"Installed{where}: {installed.version or 'unknown version'}"
+            if update and latest and latest != installed.version:
+                text += f" · {latest} available"
+        self.version_lbl.set_text(text)
+        self.version_lbl.set_visible(bool(text))
 
     def set_busy(self, busy: bool) -> None:
         self.spinner.set_visible(busy)
         self.spinner.set_spinning(busy)
-        for b in (self.install_btn, self.launch_btn, self.remove_btn):
+        for b in (self.install_btn, self.update_btn, self.launch_btn, self.remove_btn):
             b.set_sensitive(not busy)

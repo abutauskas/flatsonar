@@ -1,23 +1,14 @@
 from __future__ import annotations
 
-from collections import Counter
-
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import String, func, or_, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
+from .. import catalogue
 from ..db import get_session
-from ..models import App, CrawlRun, InstallSource, SourceKind
+from ..models import App, SourceKind
 from ..schemas import AppDetail, AppSummary, CategoryCount, Page, Stats
 
 router = APIRouter(prefix="/api", tags=["apps"])
-
-_SORTS = {
-    "name": App.name.asc(),
-    "stars": App.stars.desc(),
-    "updated": App.updated_at.desc(),
-    "newest": App.first_seen.desc(),
-}
 
 
 def _summary(app: App) -> AppSummary:
@@ -28,10 +19,12 @@ def _summary(app: App) -> AppSummary:
 
 @router.get("/apps", response_model=Page)
 def list_apps(
-    q: str | None = Query(None, description="Search name / summary / app id"),
+    q: str | None = Query(None, description="Search name / summary / app id / developer"),
     category: str | None = None,
     risk: str | None = Query(None, pattern="^(green|yellow|red)$"),
+    trust: str | None = Query(None, description="Publisher trust, comma-separated: verified,reviewed,unverified,suspicious"),
     source: SourceKind | None = Query(None, description="Only apps installable via this kind"),
+    ids: str | None = Query(None, description="Only these app ids, comma-separated (the client's installed list)"),
     oss_only: bool = True,
     sponsor_only: bool = False,
     sort: str = Query("name", pattern="^(name|stars|updated|newest)$"),
@@ -39,30 +32,19 @@ def list_apps(
     per_page: int = Query(48, ge=1, le=200),
     db: Session = Depends(get_session),
 ):
-    stmt = select(App)
-    if oss_only:
-        stmt = stmt.where(App.is_oss.is_(True))
-    if q:
-        like = f"%{q.strip()}%"
-        stmt = stmt.where(or_(App.name.ilike(like), App.summary.ilike(like), App.app_id.ilike(like)))
-    if category:
-        # categories is JSON; portable LIKE on its serialised form is good enough for now.
-        stmt = stmt.where(func.cast(App.categories, String).ilike(f'%"{category}"%'))
-    if risk:
-        stmt = stmt.where(App.risk_level == risk)
-    if source:
-        stmt = stmt.where(App.app_id.in_(select(InstallSource.app_id).where(InstallSource.kind == source)))
-    if sponsor_only:
-        stmt = stmt.where(func.cast(App.sponsor_links, String) != "[]")
-
-    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-    rows = db.scalars(stmt.order_by(_SORTS[sort]).offset((page - 1) * per_page).limit(per_page)).all()
+    try:
+        stmt = catalogue.apps_query(q=q, category=category, risk=risk, trust=trust, source=source,
+                                    oss_only=oss_only, sponsor_only=sponsor_only,
+                                    ids=ids.split(",") if ids is not None else None)
+    except catalogue.BadFilter as exc:
+        raise HTTPException(422, str(exc))
+    rows, total = catalogue.page_apps(db, stmt, sort, page, per_page)
     return Page(items=[_summary(a) for a in rows], total=total, page=page, per_page=per_page)
 
 
 @router.get("/apps/{app_id}", response_model=AppDetail)
 def get_app(app_id: str, db: Session = Depends(get_session)):
-    app = db.scalar(select(App).options(selectinload(App.sources)).where(App.app_id == app_id))
+    app = catalogue.get_app(db, app_id)
     if app is None:
         raise HTTPException(404, f"{app_id} not found")
     d = AppDetail.model_validate(app)
@@ -91,44 +73,9 @@ def get_manifest(app_id: str, db: Session = Depends(get_session)):
 
 @router.get("/categories", response_model=list[CategoryCount])
 def categories(db: Session = Depends(get_session)):
-    counter: Counter[str] = Counter()
-    for cats in db.scalars(select(App.categories).where(App.is_oss.is_(True))):
-        counter.update(cats or [])
-    return [CategoryCount(name=n, count=c) for n, c in counter.most_common()]
+    return [CategoryCount(name=n, count=c) for n, c in catalogue.category_counts(db)]
 
 
 @router.get("/stats", response_model=Stats)
 def stats(db: Session = Depends(get_session)):
-    oss = select(App).where(App.is_oss.is_(True)).subquery()
-    total = db.scalar(select(func.count()).select_from(oss)) or 0
-    on_fh = db.scalar(select(func.count()).select_from(oss).where(oss.c.on_flathub.is_(True))) or 0
-    with_sponsor = db.scalar(
-        select(func.count()).select_from(oss).where(func.cast(oss.c.sponsor_links, String) != "[]")
-    ) or 0
-    by_risk = {
-        level: count
-        for level, count in db.execute(
-            select(oss.c.risk_level, func.count()).group_by(oss.c.risk_level)
-        ).all()
-    }
-    runs = db.scalars(select(CrawlRun).order_by(CrawlRun.started_at.desc()).limit(10)).all()
-    return Stats(
-        apps=total,
-        on_flathub=on_fh,
-        off_flathub=total - on_fh,
-        with_sponsor=with_sponsor,
-        by_risk=by_risk,
-        last_crawls=[
-            {
-                "source": r.source,
-                "started_at": r.started_at,
-                "finished_at": r.finished_at,
-                "found": r.found,
-                "updated": r.updated,
-                "skipped": r.skipped,
-                "errors": len(r.errors or []),
-            }
-            for r in runs
-        ],
-    )
-
+    return Stats(**catalogue.catalogue_stats(db))

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>New apps on {{ site.name }}</title>
+  <subtitle>Open-source Flatpak apps, hunted from everywhere</subtitle>
+  <link href="{{ base_url(request) }}/" />
+  <link rel="self" href="{{ base_url(request) }}/feed.xml" />
+  <id>{{ base_url(request) }}/feed.xml</id>
+  <updated>{{ (apps[0].first_seen if apps else None)|isodate }}</updated>
+{% for app in apps %}  <entry>
+    <title>{{ app.name }}</title>
+    <link href="{{ base_url(request) }}/apps/{{ app.app_id }}" />
+    <id>{{ base_url(request) }}/apps/{{ app.app_id }}</id>
+    <updated>{{ app.first_seen|isodate }}</updated>
+    {% if app.developer_name %}<author><name>{{ app.developer_name }}</name></author>{% endif %}
+    <summary>{{ app.summary }}</summary>
+    <content type="text">{{ app.summary }} — {{ RISK_TEXT.get(app.risk_level, app.risk_level) }}, {{ TRUST_TEXT.get(app.trust, app.trust) }}{% if app.license %}, {{ app.license }}{% endif %}.</content>
+    {% for c in app.categories or [] %}<category term="{{ c }}" />{% endfor %}
+  </entry>
+{% endfor %}</feed>

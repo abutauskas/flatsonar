@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_macros.html" import app_grid %}
+{% block title %}{% if q %}“{{ q }}” — {% elif category %}{{ category }} apps — {% endif %}Apps — {{ site.name }}{% endblock %}
+{% block description %}Browse {{ total }} open-source Flatpak apps{% if category %} in {{ category }}{% endif %}, with sandbox risk and publisher trust for each.{% endblock %}
+{% block topsearch %}{% endblock %}
+
+{% block content %}
+<div class="wrap catalogue">
+  <aside class="side">
+    <h3>Categories</h3>
+    <ul class="cats">
+      <li><a href="{{ query_url(request, category=None, page=None) }}" {% if not category %}aria-current="true"{% endif %}>All apps</a></li>
+      {% for name, count in categories %}
+      <li><a href="{{ query_url(request, category=name, page=None) }}" {% if category == name %}aria-current="true"{% endif %}>{{ name }} <span>{{ count }}</span></a></li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <section class="results">
+    <form class="toolbar" action="/apps" method="get" id="filters">
+      {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
+      <label class="visually-hidden" for="q">Search</label>
+      <input id="q" class="search" type="search" name="q" value="{{ q }}" placeholder="Search name, summary, id, developer…">
+      <label class="visually-hidden" for="where">Where</label>
+      <select id="where" name="where" data-autosubmit>
+        {% for value, label in WHERE_FILTERS %}<option value="{{ value }}" {% if where == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <label class="visually-hidden" for="risk">Sandbox risk</label>
+      <select id="risk" name="risk" data-autosubmit>
+        {% for value, label in RISK_FILTERS %}<option value="{{ value }}" {% if risk == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <label class="visually-hidden" for="trust">Publisher trust</label>
+      <select id="trust" name="trust" data-autosubmit>
+        {% for value, label in TRUST_FILTERS %}<option value="{{ value }}" {% if trust == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <label class="visually-hidden" for="sort">Sort</label>
+      <select id="sort" name="sort" data-autosubmit>
+        {% for value, label in SORT_LABELS %}<option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <button class="btn primary nojs" type="submit">Apply</button>
+    </form>
+
+    <p class="count">
+      {{ '{:,}'.format(total) }} app{{ '' if total == 1 else 's' }}
+      {% if q %}matching “{{ q }}”{% endif %}
+      {% if category %}in {{ category }}{% endif %}
+      {% if q or category or risk or trust or where %}· <a href="/apps">clear filters</a>{% endif %}
+    </p>
+
+    {% if apps %}
+      {{ app_grid(apps) }}
+    {% else %}
+      <div class="empty">
+        <h3>No apps found</h3>
+        <p>Try another search or loosen the filters. The hunt is ongoing — <a href="/feed.xml">follow the feed</a> for new finds.</p>
+      </div>
+    {% endif %}
+
+    {% if pages > 1 %}
+    <nav class="pager" aria-label="Pages">
+      {% if page > 1 %}<a href="{{ query_url(request, page=page-1) }}" rel="prev">← Previous</a>{% else %}<span class="disabled">← Previous</span>{% endif %}
+      <span class="where">Page {{ page }} of {{ pages }}</span>
+      {% if page < pages %}<a href="{{ query_url(request, page=page+1) }}" rel="next">Next →</a>{% else %}<span class="disabled">Next →</span>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

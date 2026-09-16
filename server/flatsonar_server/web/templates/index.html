@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "_macros.html" import app_grid %}
+{% block bodyclass %}home{% endblock %}
+{% block topsearch %}{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="rings" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+  <div class="wrap">
+    <p class="kicker">Open-source Flatpak apps, hunted from everywhere</p>
+    <h1>F-Droid for Linux.</h1>
+    <p class="lede">
+      {{ site.name }} finds open-source apps wherever they live — Flathub, GitHub, GitLab, Codeberg,
+      project remotes, release bundles — and puts them in one store. Every listing credits the
+      people who made it. Anything risky gets explained, and you are asked twice before it runs.
+    </p>
+    <form class="hero-search" action="/apps" role="search">
+      <label class="visually-hidden" for="heroq">Search apps</label>
+      <input id="heroq" type="search" name="q" placeholder="Search {{ stats.apps }} apps…" autocomplete="off" autofocus>
+      <button class="btn primary" type="submit">Search</button>
+    </form>
+    <div class="cta">
+      <a class="btn ghost" href="/apps">Browse the catalogue</a>
+      <a class="btn ghost" href="/about#get">Get the desktop app</a>
+    </div>
+  </div>
+</section>
+
+<section class="wrap stats" aria-label="Catalogue numbers">
+  <div class="stat"><b>{{ '{:,}'.format(stats.apps) }}</b><span>open-source apps</span></div>
+  <div class="stat"><b>{{ '{:,}'.format(stats.off_flathub) }}</b><span>found outside Flathub</span></div>
+  <div class="stat"><b>{{ '{:,}'.format(stats.with_sponsor) }}</b><span>with a sponsor button</span></div>
+  <div class="stat"><b>{{ '{:,}'.format(stats.by_trust.get('verified', 0)) }}</b><span>verified creators</span></div>
+</section>
+
+<section class="block wrap">
+  <h2>How the hunt works</h2>
+  <p class="sub">Three things happen to every app before it reaches you.</p>
+  <div class="cards3">
+    <article class="card">
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+      <h3>Hunted, not submitted</h3>
+      <p>The crawler walks Flathub and the forges looking for real <code>flatpak-builder</code> manifests, <code>.flatpak</code> bundles and <code>.flatpakrepo</code> remotes. Nobody has to submit anything, and nobody is hidden for being unverified.</p>
+    </article>
+    <article class="card">
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-7.5-10A4 4 0 0 1 12 8a4 4 0 0 1 7.5 3c0 5.4-7.5 10-7.5 10z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div>
+      <h3>Credit where it is due</h3>
+      <p>Every listing names the creator and links the source. <code>FUNDING.yml</code> and AppStream donation links become a Sponsor button. {{ site.name }} is the shop window; the people behind the apps get the money.</p>
+    </article>
+    <article class="card">
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h3>Warned twice, then it is your call</h3>
+      <p>Sandbox permissions are scored, manifests are audited, the pulled files get a ClamAV scan. Yellow or red means two dialogs and two <em>Sure</em>s. Nothing is banned; nothing is quietly waved through.</p>
+    </article>
+  </div>
+</section>
+
+<section class="block wrap">
+  <h2>Who publishes this?</h2>
+  <p class="sub">An app id is a claim: <code>io.github.alice.Foo</code> says “alice on GitHub made this”. {{ site.name }} checks that claim wherever the manifest was actually found.</p>
+  <div class="trust-grid">
+    <article class="tcard verified"><h3>Verified</h3><p>The creator demonstrably controls the id: Flathub verification, or the hosting account owns the namespace, or their domain serves a well-known file listing it.</p></article>
+    <article class="tcard reviewed"><h3>Reviewed</h3><p>On Flathub: the manifest went through review and Flathub built it, but the developer has not verified the id.</p></article>
+    <article class="tcard unverified"><h3>Unverified</h3><p>Off Flathub and ownership could not be confirmed. Nothing known against it — you are told before installing.</p></article>
+    <article class="tcard suspicious"><h3>Suspicious</h3><p>A concrete red flag: an id claiming a namespace the repo neither owns nor builds from, or a build that does things a build should not.</p></article>
+  </div>
+</section>
+
+{% if hunted %}
+<section class="block wrap">
+  <div class="rowhead">
+    <div><h2>Found outside Flathub</h2><p class="sub">Apps that only exist as a manifest, a bundle or a project remote.</p></div>
+    <a class="btn ghost small" href="/apps?where=hunted&amp;sort=stars">See all</a>
+  </div>
+  {{ app_grid(hunted) }}
+</section>
+{% endif %}
+
+{% if loved %}
+<section class="block wrap">
+  <div class="rowhead">
+    <div><h2>Creators you can support</h2><p class="sub">Most-starred apps whose authors take sponsorship.</p></div>
+    <a class="btn ghost small" href="/apps?sort=stars">See all</a>
+  </div>
+  {{ app_grid(loved) }}
+</section>
+{% endif %}
+
+{% if newest %}
+<section class="block wrap">
+  <div class="rowhead">
+    <div><h2>New in the catalogue</h2><p class="sub">Latest finds from the hunt. <a href="/feed.xml">Atom feed</a>.</p></div>
+    <a class="btn ghost small" href="/apps?sort=newest">See all</a>
+  </div>
+  {{ app_grid(newest) }}
+</section>
+{% endif %}
+
+{% if categories %}
+<section class="block wrap">
+  <h2>Browse by category</h2>
+  <div class="chips">
+    {% for name, count in categories %}<a class="chip" href="/apps?category={{ name|urlencode }}">{{ name }} <span>{{ count }}</span></a>{% endfor %}
+    <a class="chip more" href="/apps">All apps →</a>
+  </div>
+</section>
+{% endif %}
+
+<section class="block wrap get" id="get">
+  <div class="getbox">
+    <div>
+      <h2>Get {{ site.name }}</h2>
+      <p class="sub">A GTK4 desktop app for Linux that installs through the two-gate check — pull, unpack, scan, re-score, ask twice, deploy — and shows you what is already installed with the same scoring.</p>
+      <p class="fine">Early days: it runs from source today. A Flatpak of {{ site.name }} itself is coming (and scores <strong>red</strong> by its own rules — a store has to talk to <code>org.freedesktop.Flatpak</code>).</p>
+    </div>
+    <div class="cmd" data-copy><code>git clone {{ site.repo }}.git &amp;&amp; cd flatsonar
+./scripts/setup-wsl.sh            # GTK4, libadwaita, flatpak, clamav
+pip install --user -e core -e client
+python -m flatsonar</code><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+  </div>
+</section>
+{% endblock %}

@@ -15,6 +15,7 @@ import posixpath
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Protocol
 
 from flatsonar_core import Manifest, is_open_source, parse_manifest_text
@@ -25,6 +26,7 @@ from . import funding
 from .appstream import MetaInfo, parse_metainfo
 from .base import Candidate, CrawlContext, SourceSpec
 from .credit import developer_from, normalise_repo_url
+from .trust import assess
 
 log = logging.getLogger("flatsonar.crawler.forge")
 
@@ -45,12 +47,26 @@ class RepoInfo:
     description: str | None = None
     homepage: str | None = None
     stars: int = 0
+    forks: int = 0
+    created_at: datetime | None = None
+    pushed_at: datetime | None = None
     license_spdx: str | None = None
     archived: bool = False
     fork: bool = False
     avatar_url: str | None = None
     tree: list[str] = field(default_factory=list)  # file paths at default branch
     release_assets: list[tuple[str, str]] = field(default_factory=list)  # (name, url)
+
+
+def parse_timestamp(value: str | None) -> datetime | None:
+    """ISO 8601 as the forges emit it (``2024-01-02T03:04:05Z``) -> aware datetime."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 class Forge(Protocol):
@@ -199,7 +215,7 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
 
         icon_path = find_icon(repo.tree, base_id)
         name = (meta.name if meta else None) or repo.full_name.rsplit("/", 1)[-1]
-        out.append(Candidate(
+        cand = Candidate(
             app_id=base_id,
             name=name,
             summary=(meta.summary if meta else None) or (repo.description or "")[:512],
@@ -215,8 +231,12 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
             sponsor_links=funding.merge(sponsor, funding.donation_link(meta.donation if meta else None)),
             latest_version=meta.latest_version if meta else None,
             stars=repo.stars,
+            forks=repo.forks,
+            repo_created_at=repo.created_at,
+            repo_pushed_at=repo.pushed_at,
             manifest=manifest,
             manifest_url=manifest_url,
             sources=sources,
-        ))
+        )
+        out.append(await assess(ctx, cand, repo))
     return out

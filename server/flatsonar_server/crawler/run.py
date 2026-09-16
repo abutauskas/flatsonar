@@ -10,7 +10,7 @@ import sys
 from ..db import SessionLocal, init_db
 from ..models import CrawlRun, utcnow
 from ..settings import settings
-from .base import CrawlContext, Source, upsert_candidate
+from .base import CrawlContext, Skipped, Source, upsert_candidate
 
 log = logging.getLogger("flatsonar.crawler.run")
 
@@ -45,6 +45,11 @@ async def crawl(source: Source, ctx: CrawlContext, limit: int | None, commit_eve
             async for cand in source.discover(ctx, limit):
                 try:
                     _, created = upsert_candidate(db, cand)
+                except Skipped as why:
+                    log.info("skipped %s", why)
+                    run.skipped += 1
+                    pending += 1
+                    continue
                 except Exception as exc:  # one bad row must not sink the crawl
                     db.rollback()
                     run.errors = [*run.errors, f"{cand.app_id}: {exc}"][-200:]

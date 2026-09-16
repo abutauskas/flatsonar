@@ -33,6 +33,7 @@ class AppInfo:
     risk_level: str = "green"
     on_flathub: bool = False
     flathub_verified: bool = False
+    trust: str = "unverified"  # verified | reviewed | unverified | suspicious
     stars: int = 0
     has_sponsor: bool = False
     # detail-only
@@ -43,6 +44,10 @@ class AppInfo:
     sponsor_links: list[dict[str, str]] = field(default_factory=list)
     risk_reasons: list[str] = field(default_factory=list)
     permissions: list[dict[str, str]] = field(default_factory=list)
+    trust_findings: list[dict[str, str]] = field(default_factory=list)  # [{check, level, reason}]
+    forks: int = 0
+    repo_created_at: str | None = None
+    repo_pushed_at: str | None = None
     latest_version: str | None = None
     sources: list[InstallSource] = field(default_factory=list)
 
@@ -53,6 +58,14 @@ class AppInfo:
         info.sources = [InstallSource(**{k: v for k, v in s.items() if k in InstallSource.__dataclass_fields__})
                         for s in d.get("sources") or []]
         return info
+
+    @classmethod
+    def unknown(cls, app_id: str, name: str = "", origin: str = "") -> "AppInfo":
+        """An installed app the index has never seen (proprietary, or from a remote we do
+        not crawl). Honest defaults: Flathub reviewed it if that is where it came from,
+        otherwise nobody has vouched for it."""
+        return cls(app_id=app_id, name=name or app_id.rsplit(".", 1)[-1],
+                   on_flathub=origin == "flathub", trust="reviewed" if origin == "flathub" else "unverified")
 
 
 @dataclass
@@ -73,20 +86,34 @@ class FlatsonarAPI:
         self._client = httpx.Client(base_url=self.base, timeout=20.0, headers={"User-Agent": "Flatsonar-client/0.1"})
 
     def list_apps(self, q: str | None = None, category: str | None = None, risk: str | None = None,
-                  sort: str = "name", page: int = 1, per_page: int = 48, sponsor_only: bool = False) -> Page:
+                  trust: str | None = None, sort: str = "name", page: int = 1, per_page: int = 48,
+                  sponsor_only: bool = False, ids: list[str] | None = None) -> Page:
         params: dict[str, Any] = {"page": page, "per_page": per_page, "sort": sort}
+        if ids is not None:
+            params["ids"] = ",".join(ids)
         if q:
             params["q"] = q
         if category:
             params["category"] = category
         if risk:
             params["risk"] = risk
+        if trust:
+            params["trust"] = trust
         if sponsor_only:
             params["sponsor_only"] = "true"
         r = self._client.get("/api/apps", params=params)
         r.raise_for_status()
         d = r.json()
         return Page([AppInfo.from_json(i) for i in d["items"]], d["total"], d["page"], d["per_page"])
+
+    def apps_by_id(self, ids: list[str]) -> dict[str, AppInfo]:
+        """Summaries for the given ids (200 per request; the server caps at 500)."""
+        out: dict[str, AppInfo] = {}
+        ids = sorted(set(ids))
+        for i in range(0, len(ids), 200):
+            page = self.list_apps(ids=ids[i:i + 200], per_page=200)
+            out.update({a.app_id: a for a in page.items})
+        return out
 
     def get_app(self, app_id: str) -> AppInfo:
         r = self._client.get(f"/api/apps/{app_id}")

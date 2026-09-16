@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, risk_pill, trust_pill %}
+{% block title %}{{ app.name }} — {{ site.name }}{% endblock %}
+{% block description %}{{ app.summary or (app.name ~ ' on ' ~ site.name) }}{% endblock %}
+{% block head %}
+<link rel="canonical" href="{{ base_url(request) }}/apps/{{ app.app_id }}">
+{% if app.icon_url %}<meta property="og:image" content="{{ app.icon_url }}">{% endif %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "SoftwareApplication", "name": app.name,
+  "description": app.summary, "operatingSystem": "Linux", "applicationCategory": (app.categories or [""])[0],
+  "license": app.license, "url": base_url(request) ~ "/apps/" ~ app.app_id, "softwareVersion": app.latest_version,
+  "author": {"@type": "Organization", "name": app.developer_name} if app.developer_name else None,
+  "offers": {"@type": "Offer", "price": "0"}
+}|tojson }}</script>
+{% endblock %}
+
+{% block content %}
+<article class="wrap apppage">
+  <header class="app-head">
+    {{ icon(app, 112) }}
+    <div class="titles">
+      <h1>{{ app.name }}</h1>
+      {% if app.developer_name %}<p class="by">by {{ app.developer_name }}</p>{% endif %}
+      <p class="summary">{{ app.summary }}</p>
+      <div class="pills big">
+        {{ risk_pill(app.risk_level) }}
+        {{ trust_pill(app.trust) }}
+        {% if app.license %}<span class="pill" title="SPDX license">{{ app.license }}</span>{% endif %}
+        {% if app.latest_version %}<span class="pill" title="Latest version">v{{ app.latest_version }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="head-actions">
+      <a class="btn primary" href="#install">Install</a>
+      {% if app.upstream_url %}<a class="btn ghost" href="{{ app.upstream_url }}" rel="noopener">Source code</a>{% endif %}
+    </div>
+  </header>
+
+  {% if app.sponsor_links %}
+  <section class="sponsor-box">
+    <div>
+      <h2>Support the creators</h2>
+      <p>{{ site.name }} is just the shop window. The people below made {{ app.name }}.</p>
+    </div>
+    <div class="sponsor-row">
+      {% for link in app.sponsor_links %}
+      <a class="btn sponsor" href="{{ link.url }}" rel="noopener sponsored" title="{{ link.url }}">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg>
+        {{ link.platform|sponsor_label }}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="app-body">
+    <div class="main">
+      {% if app.screenshots %}
+      <section class="shots" aria-label="Screenshots">
+        {% for url in app.screenshots[:8] %}
+        <a href="{{ url }}" rel="noopener"><img src="{{ url }}" alt="Screenshot {{ loop.index }} of {{ app.name }}" loading="lazy" decoding="async"></a>
+        {% endfor %}
+      </section>
+      {% endif %}
+
+      {% if app.description %}
+      <section class="prose">
+        <h2>About</h2>
+        {{ app.description|paragraphs }}
+      </section>
+      {% endif %}
+
+      <section id="permissions">
+        <h2>Permissions</h2>
+        <p class="sub">
+          {% if not perms %}Fully sandboxed: no extra permissions requested.
+          {% elif n_bad == 0 %}Everything this app can reach outside its sandbox. Nothing here weakens it.
+          {% else %}{{ n_bad }} permission{{ '' if n_bad == 1 else 's' }} weaken the sandbox. {{ site.name }} asks before installing.{% endif %}
+        </p>
+        {% if perms %}
+        <ul class="findings">
+          {% for p in perms %}
+          <li class="{{ p.level }}"><span class="lvl" aria-label="{{ p.level }}"></span><div><div class="what">{{ p.reason }}</div><code>{{ p.arg }}</code></div></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </section>
+
+      <section id="publisher">
+        <h2>Who publishes this</h2>
+        <p class="sub">{{ TRUST_TIP.get(app.trust, '') }}</p>
+        {% if findings %}
+        <ul class="findings">
+          {% for f in findings %}
+          <li class="{{ f.level }}"><span class="lvl" aria-label="{{ f.level }}"></span><div><div class="what">{{ f.reason }}</div><code>{{ f.check }}</code></div></li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="fine">The index has not assessed this publisher yet.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <aside class="aside">
+      <section class="panel" id="install">
+        <h3>Install</h3>
+        {% if not options %}
+        <p class="fine">No install source is known for this app yet.</p>
+        {% endif %}
+        {% for o in options %}
+        <div class="option">
+          <h4>{{ o.title }}</h4>
+          {% for c in o.commands %}
+          <div class="cmd" data-copy><code>{{ c }}</code><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+          {% endfor %}
+          {% if o.link %}<p class="fine"><a href="{{ o.link }}" rel="noopener">{{ o.link_text or o.link }}</a></p>{% endif %}
+          <p class="fine">{{ o.note }}</p>
+        </div>
+        {% endfor %}
+        <p class="fine tip">Installing with the {{ site.name }} desktop app adds the checks the terminal does not: the files are unpacked and scanned, the real permissions are re-scored, and you are asked twice if anything is off. <a href="/about#get">Get it</a>.</p>
+      </section>
+
+      <section class="panel facts">
+        <h3>Details</h3>
+        <dl>
+          <dt>App id</dt><dd><code>{{ app.app_id }}</code></dd>
+          {% if app.license %}<dt>License</dt><dd>{{ app.license }}</dd>{% endif %}
+          {% if app.latest_version %}<dt>Version</dt><dd>{{ app.latest_version }}</dd>{% endif %}
+          {% if app.manifest and app.manifest.runtime %}<dt>Runtime</dt><dd>{{ app.manifest.runtime }}{% if app.manifest.runtime_version %} {{ app.manifest.runtime_version }}{% endif %}</dd>{% endif %}
+          {% if app.categories %}<dt>Categories</dt><dd>{% for c in app.categories %}<a href="/apps?category={{ c|urlencode }}">{{ c }}</a>{{ ', ' if not loop.last }}{% endfor %}</dd>{% endif %}
+          {% if app.stars %}<dt>Stars</dt><dd>{{ '{:,}'.format(app.stars) }}{% if app.forks %} · {{ '{:,}'.format(app.forks) }} forks{% endif %}</dd>{% endif %}
+          {% if app.repo_created_at %}<dt>Repo since</dt><dd>{{ app.repo_created_at|nicedate('%b %Y') }}</dd>{% endif %}
+          {% if app.repo_pushed_at %}<dt>Last push</dt><dd>{{ app.repo_pushed_at|nicedate }}</dd>{% endif %}
+          <dt>Where</dt><dd>{% if app.on_flathub %}On Flathub{% else %}Outside Flathub{% endif %}</dd>
+          <dt>Listed since</dt><dd>{{ app.first_seen|nicedate }}</dd>
+        </dl>
+        <ul class="links">
+          {% if app.homepage %}<li><a href="{{ app.homepage }}" rel="noopener">Homepage</a></li>{% endif %}
+          {% if app.upstream_url %}<li><a href="{{ app.upstream_url }}" rel="noopener">Source code</a></li>{% endif %}
+          {% if app.on_flathub %}<li><a href="https://flathub.org/apps/{{ app.app_id }}" rel="noopener">On Flathub</a></li>{% endif %}
+          {% if app.manifest %}<li><a href="/api/apps/{{ app.app_id }}/manifest">Manifest (JSON)</a></li>{% endif %}
+          <li><a href="{{ site.issues }}/new?title={{ ('Listing: ' ~ app.app_id)|urlencode }}" rel="noopener">Report this listing</a></li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+</article>
+{% endblock %}

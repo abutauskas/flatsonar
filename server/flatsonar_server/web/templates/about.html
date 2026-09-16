@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}About — {{ site.name }}{% endblock %}
+{% block description %}What {{ site.name }} is, how it hunts apps, how it decides who publishes them, and how the two-warning install works.{% endblock %}
+
+{% block content %}
+<div class="wrap aboutpage">
+  <header class="pagehead">
+    <h1>How {{ site.name }} works</h1>
+    <p class="lede">F-Droid for Linux: a store that hunts open-source Flatpak apps instead of waiting for them to be submitted, credits the people who made them, and tells you what you are about to run.</p>
+  </header>
+
+  <nav class="toc" aria-label="On this page">
+    <a href="#hunt">The hunt</a>
+    <a href="#trust">Who publishes this?</a>
+    <a href="#warning">How the warning works</a>
+    <a href="#get">Get the app</a>
+    <a href="#developers">For developers</a>
+    <a href="#api">API</a>
+  </nav>
+
+  <div class="prose">
+    <section id="hunt">
+      <h2>The hunt</h2>
+      <p>Most stores list what people submit. {{ site.name }} goes looking. The crawler walks:</p>
+      <ul>
+        <li><strong>Flathub</strong> — API v2 for metadata and the <em>deployed</em> permissions, plus the <code>github.com/flathub/&lt;id&gt;</code> manifest for <code>sources</code>, which is where the upstream repository and creator credit come from.</li>
+        <li><strong>GitHub, GitLab, Codeberg</strong> — repositories tagged <code>flatpak</code> (and code search, with a token) whose tree contains a <code>reverse.dns.Name.{json,yml,yaml}</code> manifest. The <code>.metainfo.xml</code> gives the name, summary, license and screenshots; <code>FUNDING.yml</code> and AppStream <code>&lt;url type="donation"&gt;</code> give the Sponsor buttons.</li>
+      </ul>
+      <p>Release assets ending in <code>.flatpak</code> become one-click bundle installs, <code>.flatpakrepo</code> files become remotes, and anything that only has a manifest is built locally with <code>flatpak-builder</code>.</p>
+      <p>Only OSI/FSF-approved SPDX licenses are listed. Proprietary apps on Flathub are skipped. Verification is never a filter: unverified publishers are indexed like everyone else and labelled honestly.</p>
+      <p class="numbers">Right now: <strong>{{ '{:,}'.format(stats.apps) }}</strong> apps, <strong>{{ '{:,}'.format(stats.off_flathub) }}</strong> of them found outside Flathub, <strong>{{ '{:,}'.format(stats.with_sponsor) }}</strong> with a sponsor link.</p>
+    </section>
+
+    <section id="trust">
+      <h2>Who publishes this?</h2>
+      <p>An app id is a claim. <code>io.github.alice.Foo</code> says “alice on GitHub made this”; <code>org.mozilla.firefox</code> says “Mozilla made this”. Flathub checks that claim by hand. {{ site.name }} re-derives the rules and applies them to wherever the manifest was actually found. Every app gets one of four levels:</p>
+      <table class="levels">
+        <tr><th class="verified">Verified</th><td>The creator demonstrably controls the id: Flathub verification, or the hosting account owns the namespace (<code>io.github.alice.*</code> hosted by alice, <code>org.gnome.*</code> on gitlab.gnome.org, …), or the id's domain serves <code>/.well-known/org.flathub.VerifiedApps.txt</code> listing it.</td></tr>
+        <tr><th class="reviewed">Reviewed</th><td>On Flathub: manifest reviewed and built by Flathub, but the developer has not verified the id.</td></tr>
+        <tr><th class="unverified">Unverified</th><td>Off Flathub and ownership could not be confirmed (a custom domain with no well-known file, or a third-party packager building someone else's code). Nothing known against it.</td></tr>
+        <tr><th class="suspicious">Suspicious</th><td>A concrete red flag: the id claims a namespace the repository neither owns nor builds from, or the build does things a build should not, or a bundle is served over plain HTTP.</td></tr>
+      </table>
+      <p>Yellow notes never downgrade an app on their own — a repository that is three days old with no stars, a name shared with a Flathub app, an id someone else also publishes — but they are listed before installing.</p>
+      <p>One app id, one publisher. Flathub always keeps its row, and a repository claiming a Flathub app's id may only enrich it when it <em>is</em> the repository Flathub builds from, so nobody can plant a sponsor button on someone else's app. Between two off-Flathub publishers the first one seen keeps the id unless the newcomer is strictly more trusted — the real owner turning up after a copy.</p>
+      <p>Before anything is built, the manifest itself is audited: <code>extra-data</code> downloaded at install time after any scan, sources over plain <code>http://</code>, archives without a checksum, git sources tracking a branch, prebuilt binaries instead of source, build arguments that open the build sandbox, and build commands such as <code>curl | sh</code>, <code>base64 -d</code>, setuid bits or <code>flatpak-spawn --host</code>.</p>
+    </section>
+
+    <section id="warning">
+      <h2>How the warning works</h2>
+      <p>The desktop app's install flow has two gates, because two different things can be wrong.</p>
+      <h3>Gate one, before anything runs</h3>
+      <p>The publisher findings above plus, for apps built locally from a manifest, a fresh audit of the manifest that was just downloaded — never the index's copy; it must also build the app id it claims. For manifest installs this gate comes <em>before</em> <code>flatpak-builder</code> starts: the build is the risk. Installing from a project's own remote also warns that future updates will come from that remote.</p>
+      <h3>Gate two, after pull or build</h3>
+      <ol>
+        <li><code>flatpak install --no-deploy</code> pulls the app into the local OSTree repository without deploying it (or <code>flatpak-builder</code> builds it into a local repository).</li>
+        <li><code>ostree checkout</code> materialises the files; ClamAV scans them.</li>
+        <li>The deployed <code>metadata</code> file is parsed back into <code>finish-args</code> and scored: host filesystem, <code>--device=all</code>, session or system bus, sandbox escape via <code>org.freedesktop.Flatpak</code>, <code>LD_PRELOAD</code>, credential paths → red; X11, home folder, keyring → yellow. The index's score is only a preview; the real files decide.</li>
+        <li>Yellow or red: dialog one lists the findings, dialog two says it is on you. Two <em>Sure</em>s and it deploys. Accepted findings are remembered per app until they change, so updates only ask again when they add something.</li>
+      </ol>
+      <p>An unverified publisher alone is yellow: a perfectly sandboxed app from someone nobody has vouched for still gets the two dialogs. A suspicious one is red.</p>
+      <p>{{ site.name }} packaged as a Flatpak scores <strong>red</strong> by its own rules: a store has to talk to <code>org.freedesktop.Flatpak</code> to install things on the host. That is the honest answer.</p>
+    </section>
+
+    <section id="get">
+      <h2>Get the app</h2>
+      <p>The desktop client is a GTK4 / libadwaita app for Linux. It is early: today it runs from source.</p>
+      <div class="cmd" data-copy><code>git clone {{ site.repo }}.git &amp;&amp; cd flatsonar
+./scripts/setup-wsl.sh            # GTK4, libadwaita, flatpak, clamav (Debian/Ubuntu)
+pip install --user -e core -e client
+FLATSONAR_API={{ base_url(request) }} python -m flatsonar</code><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+      <p>Press <kbd>Ctrl</kbd>+<kbd>I</kbd> for the Installed page: every Flatpak on the machine, user and system, scored from its deployed permissions — whether or not {{ site.name }} installed it — with Update wherever something newer exists.</p>
+    </section>
+
+    <section id="developers">
+      <h2>For developers: getting listed</h2>
+      <p>There is nothing to submit. Make your project findable and the hunt will find it:</p>
+      <ul>
+        <li>Keep a <code>flatpak-builder</code> manifest in your repository named after your app id: <code>io.github.you.App.json</code> or <code>.yml</code>.</li>
+        <li>Ship an AppStream <code>io.github.you.App.metainfo.xml</code>: name, summary, description, screenshots, license, releases. That is what the listing is made of.</li>
+        <li>Add the <code>flatpak</code> topic to the repository.</li>
+        <li>Add a <code>FUNDING.yml</code> or a <code>&lt;url type="donation"&gt;</code> and your listing gets a Sponsor button.</li>
+        <li>Use an id you own. <code>io.github.you.*</code> is verified automatically when the repository is under <code>you</code>; a custom domain is verified by serving <code>https://your.domain/.well-known/org.flathub.VerifiedApps.txt</code> with the id on a line.</li>
+        <li>Pin your sources (<code>sha256</code> for archives, <code>commit</code> for git), keep <code>finish-args</code> tight, and the badges take care of themselves.</li>
+      </ul>
+      <p>Something wrong with a listing — credit, license, an impostor? <a href="{{ site.issues }}" rel="noopener">Open an issue</a>.</p>
+    </section>
+
+    <section id="api">
+      <h2>API</h2>
+      <p>Everything on this site is available as JSON at <a href="/docs"><code>/api</code></a>: <code>/api/apps?q=&amp;category=&amp;risk=&amp;trust=&amp;sort=</code>, <code>/api/apps/{id}</code>, <code>/api/apps/{id}/manifest</code>, <code>/api/categories</code> and <code>/api/stats</code>. New apps are also published as an <a href="/feed.xml">Atom feed</a>.</p>
+      <p>{{ site.name }} is free software under the GPL-3.0-or-later. Every app listed belongs to its own authors under its own license — {{ site.name }} just points at them. <a href="{{ site.repo }}" rel="noopener">Source on GitHub</a>.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}

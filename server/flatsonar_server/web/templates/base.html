@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ site.name }} — {{ site.tagline }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}Open-source Flatpak apps, hunted from Flathub, GitHub, GitLab and Codeberg, with credit to their creators and a warning before anything risky.{% endblock %}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ site.name }}">
+  <meta property="og:title" content="{{ self.title() }}">
+  <meta property="og:description" content="{{ self.description() }}">
+  <meta property="og:url" content="{{ base_url(request) }}{{ request.url.path }}">
+  {% block head %}{% endblock %}
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="alternate" type="application/atom+xml" title="New apps on {{ site.name }}" href="/feed.xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v={{ site.version }}">
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="{{ site.name }} home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><use href="/static/logo.svg#mark"/></svg>
+      <span>{{ site.name }}</span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="/apps" {% if request.url.path.startswith('/apps') %}aria-current="page"{% endif %}>Apps</a>
+      <a href="/about" {% if request.url.path == '/about' %}aria-current="page"{% endif %}>About</a>
+      <a href="{{ site.repo }}" rel="noopener">GitHub</a>
+    </nav>
+    {% block topsearch %}
+    <form class="topsearch" action="/apps" role="search">
+      <label class="visually-hidden" for="topq">Search apps</label>
+      <input id="topq" class="search" type="search" name="q" placeholder="Search apps…" autocomplete="off">
+    </form>
+    {% endblock %}
+  </div>
+</header>
+
+<main id="main">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <div class="wrap foot">
+    <div>
+      <div class="brand small"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="/static/logo.svg#mark"/></svg> {{ site.name }}</div>
+      <p>{{ site.tagline }}. Every app listed here belongs to its own authors under its own license — {{ site.name }} just points at them.</p>
+      <p class="fine">{{ site.name }} is free software, GPL-3.0-or-later.</p>
+    </div>
+    <ul class="footlinks">
+      <li><a href="/apps">Browse apps</a></li>
+      <li><a href="/about">How it works</a></li>
+      <li><a href="/about#get">Get the app</a></li>
+      <li><a href="/docs">API</a></li>
+      <li><a href="/feed.xml">New apps feed</a></li>
+      <li><a href="{{ site.repo }}" rel="noopener">Source code</a></li>
+      <li><a href="{{ site.issues }}" rel="noopener">Report a problem</a></li>
+    </ul>
+  </div>
+</footer>
+<script src="/static/site.js?v={{ site.version }}" defer></script>
+</body>
+</html>

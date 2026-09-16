@@ -33,8 +33,16 @@ class Decisions:
         key = "\n".join(sorted(report.reasons))
         return hashlib.sha256(key.encode()).hexdigest()[:16]
 
-    def already_accepted(self, app_id: str, fingerprint: str) -> bool:
-        return self._data.get(app_id, {}).get("fingerprint") == fingerprint
+    def already_accepted(self, app_id: str, report: RiskReport) -> bool:
+        """True if the user already pressed Sure for these findings, or for a superset
+        of them (the install flow asks once for the publisher and once more only if the
+        build adds something; the second answer covers the first)."""
+        stored = self._data.get(app_id)
+        if not stored:
+            return False
+        if stored.get("fingerprint") == self.fingerprint(report):
+            return True
+        return set(report.reasons) <= set(stored.get("reasons") or [])
 
     def accept(self, app_id: str, fingerprint: str, report: RiskReport) -> None:
         self._data[app_id] = {
