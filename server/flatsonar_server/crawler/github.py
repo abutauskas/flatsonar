@@ -19,6 +19,7 @@ API = "https://api.github.com"
 REPO_QUERIES = [
     "topic:flatpak",
     "topic:flatpak-app",
+    "topic:flatpak-builder",
     "topic:libadwaita",
     "topic:gtk4 flatpak",
     "topic:kirigami flatpak",

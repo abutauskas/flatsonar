@@ -7,6 +7,7 @@ authors.
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 from dataclasses import dataclass, field
@@ -85,6 +86,21 @@ def _strip_json_comments(text: str) -> str:
     return _LINE_COMMENT.sub("", text)
 
 
+def _json_safe(value: Any) -> Any:
+    """PyYAML's ``safe_load`` turns an unquoted ``2024-01-02`` into a real
+    ``date``/``datetime``, which the stdlib ``json`` module (and the SQLite/Postgres
+    JSON column this ends up in) cannot serialise. Manifests are written by hundreds
+    of different projects; walk the parsed tree and make everything JSON-native
+    rather than special-case the one field that happened to trip on it first."""
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
 def _load(text: str, hint: str | None = None) -> Any:
     stripped = text.lstrip()
     looks_json = stripped.startswith("{") or (hint or "").endswith(".json")
@@ -140,6 +156,7 @@ def parse_manifest_text(text: str, filename: str | None = None) -> Manifest:
     data = _load(text, filename)
     if not isinstance(data, dict):
         raise ManifestError("manifest root must be a mapping")
+    data = _json_safe(data)
 
     app_id = data.get("app-id") or data.get("id")
     if not app_id or not isinstance(app_id, str):

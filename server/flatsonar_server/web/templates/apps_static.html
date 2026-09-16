@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_macros.html" import app_grid %}
+{% block title %}Apps — {{ site.name }}{% endblock %}
+{% block description %}Browse {{ total }} open-source Flatpak apps, with sandbox risk and publisher trust for each.{% endblock %}
+{% block topsearch %}{% endblock %}
+
+{# Every app is rendered into the page (SEO, no-JS): filtering/sorting/pagination below is
+   done client-side over these same elements (see static-catalogue in site.js), because a
+   GitHub Pages deployment has no server to run the query against. See web/build.py. #}
+{% block content %}
+<div class="wrap catalogue">
+  <aside class="side">
+    <h3>Categories</h3>
+    <ul class="cats" data-cat-list>
+      <li><a href="?" data-cat="">All apps</a></li>
+      {% for name, count in categories %}
+      <li><a href="?category={{ name|urlencode }}" data-cat="{{ name }}">{{ name }} <span>{{ count }}</span></a></li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <section class="results" data-catalogue data-page-size="36">
+    <noscript><p class="fine">JavaScript is off, so search and filters won't work here — showing the full catalogue.</p></noscript>
+    <form class="toolbar" id="filters" data-catalogue-form>
+      <label class="visually-hidden" for="q">Search</label>
+      <input id="q" class="search" type="search" name="q" placeholder="Search name, summary, id, developer…" autocomplete="off">
+      <label class="visually-hidden" for="where">Where</label>
+      <select id="where" name="where">
+        {% for value, label in WHERE_FILTERS %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+      <label class="visually-hidden" for="risk">Sandbox risk</label>
+      <select id="risk" name="risk">
+        {% for value, label in RISK_FILTERS %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+      <label class="visually-hidden" for="trust">Publisher trust</label>
+      <select id="trust" name="trust">
+        {% for value, label in TRUST_FILTERS %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+      <label class="visually-hidden" for="sort">Sort</label>
+      <select id="sort" name="sort">
+        {% for value, label in SORT_LABELS %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </form>
+
+    <p class="count" data-count>{{ '{:,}'.format(total) }} app{{ '' if total == 1 else 's' }}</p>
+
+    {{ app_grid(apps) }}
+
+    <div class="empty" data-empty hidden>
+      <h3>No apps found</h3>
+      <p>Try another search or loosen the filters. The hunt is ongoing — <a href="/feed.xml">follow the feed</a> for new finds.</p>
+    </div>
+
+    <div class="loadmore" data-loadmore hidden>
+      <button class="btn ghost" type="button" data-loadmore-btn>Load more</button>
+    </div>
+  </section>
+</div>
+{% endblock %}

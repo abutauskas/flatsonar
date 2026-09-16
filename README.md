@@ -184,6 +184,27 @@ docker run -p 8000:8000 -v flatsonar-data:/data flatsonar
 docker run --rm -v flatsonar-data:/data flatsonar python -m flatsonar_server.crawler.run --source all
 ```
 
+### GitHub Pages
+
+GitHub Pages only serves static files, so there is a second, static-only build of
+the same site: `python -m flatsonar_server.web.build --out public --site-url
+https://<user>.github.io/<repo>` (`server/flatsonar_server/web/build.py`) renders
+every page once with the live app's own templates and writes them to disk. The one
+thing a static host cannot do is run the `/apps` search/filter query server-side,
+so that page ships every open-source app in the HTML (search engines and no-JS
+visitors see the whole catalogue) and `site.js` filters, sorts and paginates over
+it client-side instead — same look, same URLs (`?category=`, `?risk=`, ...), no
+server. `/api` has no static equivalent; `/apps.json` is a flat dump of the same
+summary fields as a fallback, linked from the footer.
+
+`.github/workflows/pages.yml` does this automatically: it crawls (see "Keeping it
+fresh" below), builds, and deploys to `https://<user>.github.io/<repo>/` via
+GitHub's official Pages Actions. It needs **Settings → Pages → Source → GitHub
+Actions** enabled once, and it commits the refreshed `server/flatsonar.db` back to
+the branch after every crawl (deliberately un-ignored in `.gitignore`) so
+`first_seen` dates, the "new in the catalogue" section and the Atom feed survive
+between runs.
+
 ## Hunting
 
 `python -m flatsonar_server.crawler.run --source all` walks:
@@ -201,6 +222,31 @@ docker run --rm -v flatsonar-data:/data flatsonar python -m flatsonar_server.cra
 Only OSI/FSF-approved SPDX licenses are listed. Proprietary apps on Flathub are skipped.
 Verification is never a filter for the crawler: unverified publishers are indexed
 like everyone else and labelled honestly.
+
+GitLab hunting is not limited to gitlab.com: `settings.gitlab_instances` (env
+`GITLAB_INSTANCES`) also walks gitlab.gnome.org, invent.kde.org,
+gitlab.freedesktop.org and gitlab.xfce.org by default, since that is where a
+meaningful share of desktop Linux software actually lives — self-hosted instances
+never show up in a gitlab.com-only search.
+
+A crawl commit is resilient by design: one manifest that fails to *commit* (as
+opposed to one that fails to even parse, which was already handled per-candidate)
+no longer takes the rest of a multi-thousand-app run down with it, and one source
+failing outright does not stop `--source all` from trying the others. Errors are
+recorded on the `CrawlRun` row (`/api/stats` → `last_crawls[].errors`) instead of
+being silent or fatal.
+
+### Keeping it fresh
+
+`--limit` exists for a quick local smoke test; a real catalogue wants a full,
+unlimited, scheduled crawl. `.github/workflows/pages.yml` runs one weekly
+(`workflow_dispatch` for an on-demand run, with an optional `limit` input) using
+whatever GitHub Actions injects automatically as `GITHUB_TOKEN` — enough to hunt
+GitHub without any setup. For higher rate limits, or to hunt GitLab/Codeberg with
+a token, add repo secrets `CRAWLER_GITHUB_TOKEN`, `GITLAB_TOKEN`, `CODEBERG_TOKEN`
+(Settings → Secrets and variables → Actions); none need any scope beyond reading
+public data. Locally the same tokens go in `server/.env` (see
+`server/.env.example`).
 
 ## License
 

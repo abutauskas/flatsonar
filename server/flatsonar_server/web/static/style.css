@@ -211,6 +211,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .app-card .dev { color: var(--muted); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-card .summary { color: var(--muted); font-size: .9rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .app-card .pills { margin-top: 8px; }
+.app-card[hidden] { display: none; }  /* [hidden] alone loses to the display:flex above */
 
 /* --- catalogue -------------------------------------------------------------------- */
 
@@ -233,6 +234,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .pager a:hover { border-color: var(--accent); }
 .pager .disabled { color: var(--muted); opacity: .6; }
 .pager .where { border: none; color: var(--muted); }
+.loadmore { text-align: center; margin: 36px 0 0; }
 
 /* --- app page --------------------------------------------------------------------- */
 

@@ -21,10 +21,11 @@ def build_sources(names: list[str]) -> list[Source]:
     from .github import GitHubSource
     from .gitlab import GitLabSource
 
+    gitlab_instances = ("https://gitlab.com", *(u.strip() for u in settings.gitlab_instances.split(",") if u.strip()))
     table = {
         "flathub": lambda: FlathubSource(),
         "github": lambda: GitHubSource(settings.github_token),
-        "gitlab": lambda: GitLabSource(settings.gitlab_token),
+        "gitlab": lambda: GitLabSource(settings.gitlab_token, base_urls=gitlab_instances),
         "codeberg": lambda: CodebergSource(settings.codeberg_token),
     }
     if names == ["all"]:
@@ -33,6 +34,22 @@ def build_sources(names: list[str]) -> list[Source]:
     if unknown:
         raise SystemExit(f"unknown source(s): {', '.join(unknown)}; choose from {', '.join(table)} or all")
     return [table[n]() for n in names]
+
+
+def _safe_commit(db, run: CrawlRun, what: str) -> bool:
+    """Commit, or roll back and keep going. A single crawl can touch thousands of
+    apps from hundreds of different projects; one row that fails to *commit* (as
+    opposed to one that fails to even build, which ``upsert_candidate`` callers
+    already handle) must not be allowed to take the rest of the run down with it."""
+    try:
+        db.add(run)
+        db.commit()
+        return True
+    except Exception as exc:
+        db.rollback()
+        run.errors = [*run.errors, f"{what}: {exc}"][-200:]
+        log.error("commit failed (%s), rolled back and continuing: %s", what, exc)
+        return False
 
 
 async def crawl(source: Source, ctx: CrawlContext, limit: int | None, commit_every: int = 25) -> CrawlRun:
@@ -63,31 +80,40 @@ async def crawl(source: Source, ctx: CrawlContext, limit: int | None, commit_eve
                     run.updated += 1
                 pending += 1
                 if pending >= commit_every:
-                    db.add(run)
-                    db.commit()
+                    _safe_commit(db, run, f"batch ending at {cand.app_id}")
                     pending = 0
                     log.info("%s: +%d new, %d updated, %d skipped", source.name, run.found, run.updated, run.skipped)
         finally:
             run.finished_at = utcnow()
-            db.add(run)
-            db.commit()
+            _safe_commit(db, run, "final")
     return run
 
 
 async def amain(args: argparse.Namespace) -> int:
     init_db()
     ctx = CrawlContext(concurrency=args.concurrency)
+    failed: list[str] = []
     try:
         for source in build_sources(args.source):
             log.info("crawling %s (limit=%s)", source.name, args.limit)
-            run = await crawl(source, ctx, args.limit)
+            try:
+                run = await crawl(source, ctx, args.limit)
+            except Exception:
+                # Belt and braces on top of crawl()'s own recovery: one source having
+                # a genuinely bad day (the forge is down, a bug we have not hit yet)
+                # must not stop `--source all` from trying the rest.
+                log.exception("%s crawl aborted; moving on to the next source", source.name)
+                failed.append(source.name)
+                continue
             log.info(
                 "%s done: %d new, %d updated, %d skipped, %d errors",
                 source.name, run.found, run.updated, run.skipped, len(run.errors),
             )
     finally:
         await ctx.close()
-    return 0
+    if failed:
+        log.error("source(s) aborted: %s", ", ".join(failed))
+    return 1 if failed else 0
 
 
 def main(argv: list[str] | None = None) -> int:

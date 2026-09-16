@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     github_token: str | None = None
     gitlab_token: str | None = None
     codeberg_token: str | None = None
+    # Self-hosted GitLab instances to hunt besides gitlab.com, comma-separated. Where a lot
+    # of desktop-Linux software actually lives: GNOME, KDE and freedesktop.org each run their
+    # own instance and gitlab.com search alone never sees them.
+    gitlab_instances: str = (
+        "https://gitlab.gnome.org,https://invent.kde.org,"
+        "https://gitlab.freedesktop.org,https://gitlab.xfce.org"
+    )
     crawl_cache_dir: Path = _SERVER_DIR / ".crawl-cache"
     cors_origins: str = "*"
     site_url: str | None = None  # public origin for sitemap/feed links, e.g. https://flatsonar.org

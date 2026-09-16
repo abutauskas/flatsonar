@@ -20,7 +20,6 @@ SORTS = {
     "updated": App.updated_at.desc(),
     "newest": App.first_seen.desc(),
 }
-RISKS = ("green", "yellow", "red")
 TRUSTS = tuple(level.label for level in TrustLevel)
 
 

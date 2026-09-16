@@ -18,6 +18,15 @@ server/.env
 *.sqlite3
 server/data/
 .crawl-cache/
+# The crawled catalogue IS the published site's data and has to survive between CI
+# runs (first_seen dates, the Atom feed, id-collision history) or a fresh crawl
+# would relist everything as "new" every time; track it deliberately.
+!/server/flatsonar.db
+
+# Scratch (previews, local test builds)
+.servetest/
+.buildtest/
+public/
 
 # flatpak-builder
 .flatpak-builder/

@@ -137,7 +137,7 @@
           {% if app.homepage %}<li><a href="{{ app.homepage }}" rel="noopener">Homepage</a></li>{% endif %}
           {% if app.upstream_url %}<li><a href="{{ app.upstream_url }}" rel="noopener">Source code</a></li>{% endif %}
           {% if app.on_flathub %}<li><a href="https://flathub.org/apps/{{ app.app_id }}" rel="noopener">On Flathub</a></li>{% endif %}
-          {% if app.manifest %}<li><a href="/api/apps/{{ app.app_id }}/manifest">Manifest (JSON)</a></li>{% endif %}
+          {% if app.manifest %}<li><a href="{{ manifest_href or ('/api/apps/' ~ app.app_id ~ '/manifest') }}">Manifest (JSON)</a></li>{% endif %}
           <li><a href="{{ site.issues }}/new?title={{ ('Listing: ' ~ app.app_id)|urlencode }}" rel="noopener">Report this listing</a></li>
         </ul>
       </section>

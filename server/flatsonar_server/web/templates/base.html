@@ -55,7 +55,11 @@
       <li><a href="/apps">Browse apps</a></li>
       <li><a href="/about">How it works</a></li>
       <li><a href="/about#get">Get the app</a></li>
+      {% if STATIC_BUILD %}
+      <li><a href="/apps.json" title="Full catalogue as JSON: no live API on GitHub Pages">Catalogue JSON</a></li>
+      {% else %}
       <li><a href="/docs">API</a></li>
+      {% endif %}
       <li><a href="/feed.xml">New apps feed</a></li>
       <li><a href="{{ site.repo }}" rel="noopener">Source code</a></li>
       <li><a href="{{ site.issues }}" rel="noopener">Report a problem</a></li>

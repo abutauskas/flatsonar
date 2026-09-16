@@ -101,6 +101,23 @@ def test_parse_yaml():
     assert m.sources[0].tag == "47.0"
 
 
+def test_parse_yaml_with_unquoted_date_is_json_safe():
+    """An unquoted ``2024-01-02``-shaped scalar anywhere in a YAML manifest becomes a
+    real ``datetime.date`` under ``yaml.safe_load``. A crawl over thousands of
+    manifests from as many different projects *will* hit one eventually (a
+    ``x-checker-data`` block, a stray ``date:`` key, ...); ``raw`` has to survive
+    ``json.dumps`` regardless, because that is exactly what the JSON column it is
+    stored in does under the hood. Regression for a real crash: one such manifest
+    took down a whole crawl run because the failure only surfaced at commit time,
+    past every per-candidate try/except."""
+    import json
+
+    text = "app-id: org.example.Dated\nruntime: org.gnome.Platform\nmodules:\n  - name: x\n    x-checker-data:\n      released: 2024-01-02\n      checked: 2024-01-02T03:04:05\n"
+    m = parse_manifest_text(text, "org.example.Dated.yml")
+    json.dumps(m.raw)  # must not raise
+    assert m.raw["modules"][0]["x-checker-data"]["released"] == "2024-01-02"
+
+
 def test_parse_rejects_non_manifest():
     with pytest.raises(ManifestError):
         parse_manifest_text("{}")

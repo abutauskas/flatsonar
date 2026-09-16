@@ -18,7 +18,13 @@
 {%- endmacro %}
 
 {% macro app_card(app) -%}
-<a class="app-card" href="/apps/{{ app.app_id }}">
+<a class="app-card" href="/apps/{{ app.app_id }}"
+   data-id="{{ app.app_id }}" data-name="{{ app.name }}"
+   data-search="{{ (app.name ~ ' ' ~ app.summary ~ ' ' ~ app.app_id ~ ' ' ~ (app.developer_name or ''))|lower }}"
+   data-category="{{ (app.categories or [])|join(',') }}" data-risk="{{ app.risk_level }}" data-trust="{{ app.trust }}"
+   data-where="{{ 'flathub' if app.on_flathub else 'hunted' }}" data-sponsor="{{ '1' if app.sponsor_links else '0' }}"
+   data-stars="{{ app.stars or 0 }}" data-updated="{{ app.updated_at|isodate if app.updated_at else '' }}"
+   data-created="{{ app.first_seen|isodate if app.first_seen else '' }}">
   {{ icon(app) }}
   <div class="meta">
     <div class="name">{{ app.name }}</div>

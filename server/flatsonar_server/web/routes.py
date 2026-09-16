@@ -150,6 +150,7 @@ templates.env.globals.update(
     site=SITE, RISK_TEXT=RISK_TEXT, RISK_TIP=RISK_TIP, TRUST_TEXT=TRUST_TEXT, TRUST_TIP=TRUST_TIP,
     SORT_LABELS=SORT_LABELS, RISK_FILTERS=RISK_FILTERS, TRUST_FILTERS=TRUST_FILTERS, WHERE_FILTERS=WHERE_FILTERS,
     query_url=query_url, base_url=base_url,
+    STATIC_BUILD=False,  # flipped to True for the duration of a GitHub Pages build; see web.build
 )
 
 
