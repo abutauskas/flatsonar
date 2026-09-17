@@ -4,6 +4,7 @@ both list, filter and count exactly the same apps."""
 from __future__ import annotations
 
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import String, func, or_, select
@@ -91,6 +92,24 @@ def category_counts(db: Session) -> list[tuple[str, int]]:
     for cats in db.scalars(select(App.categories).where(App.is_oss.is_(True))):
         counter.update(cats or [])
     return counter.most_common()
+
+
+def discoveries_by_day(db: Session, days: int = 30) -> list[tuple[str, int]]:
+    """How many open-source apps got a ``first_seen`` on each of the last ``days``
+    days. ``date()`` truncates a timestamp the same way on SQLite and Postgres."""
+    day = func.date(App.first_seen)
+    rows = dict(db.execute(
+        select(day, func.count()).where(App.is_oss.is_(True)).group_by(day).order_by(day)
+    ).all())
+    today = datetime.now(timezone.utc).date()
+    return [
+        ((today - timedelta(days=i)).isoformat(), rows.get((today - timedelta(days=i)).isoformat(), 0))
+        for i in range(days - 1, -1, -1)
+    ]
+
+
+def crawl_history(db: Session, limit: int = 40) -> list[CrawlRun]:
+    return list(db.scalars(select(CrawlRun).order_by(CrawlRun.started_at.desc()).limit(limit)).all())
 
 
 def catalogue_stats(db: Session) -> dict[str, Any]:

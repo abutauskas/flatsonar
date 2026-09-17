@@ -29,7 +29,7 @@ def test_home_renders_stats_and_sections(client, session):
     r = client.get("/")
     assert r.status_code == 200 and "text/html" in r.headers["content-type"]
     html = r.text
-    assert "F-Droid for Linux." in html
+    assert "The store that hunts." in html
     assert "Found outside Flathub" in html and "io.github.alice.Hunted" in html
     assert "Creators you can support" in html and "org.gnome.Calculator" in html
     assert "Spotify" not in html  # proprietary never shows

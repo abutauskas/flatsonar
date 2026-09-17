@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Analytics - {{ site.name }}{% endblock %}
+{% block topsearch %}{% endblock %}
+
+{% block content %}
+<div class="wrap analytics">
+  <header class="pagehead">
+    <h1>Analytics</h1>
+    <p class="lede">Not linked anywhere. Requires the admin token.</p>
+  </header>
+
+  <section class="stats" aria-label="Catalogue numbers">
+    <div class="stat"><b>{{ '{:,}'.format(stats.apps) }}</b><span>open-source apps</span></div>
+    <div class="stat"><b>{{ '{:,}'.format(stats.off_flathub) }}</b><span>found outside Flathub</span></div>
+    <div class="stat"><b>{{ '{:,}'.format(stats.with_sponsor) }}</b><span>with a sponsor button</span></div>
+    <div class="stat"><b>{{ '{:,}'.format(stats.by_trust.get('verified', 0)) }}</b><span>verified creators</span></div>
+  </section>
+
+  {% set risk_order = [('red', 'Dangerous'), ('yellow', 'Broad'), ('green', 'Sandboxed')] %}
+  {% set risk_max = stats.by_risk.values() | max if stats.by_risk else 1 %}
+  {% set trust_order = [('suspicious', 'Suspicious'), ('unverified', 'Unverified'), ('reviewed', 'Reviewed'), ('verified', 'Verified')] %}
+  {% set trust_max = stats.by_trust.values() | max if stats.by_trust else 1 %}
+  {% set cat_max = categories[0][1] if categories else 1 %}
+
+  <div class="chart-grid">
+    <section class="card chart">
+      <h2>Sandbox risk</h2>
+      <div class="hbars">
+        {% for key, label in risk_order %}
+        {% set n = stats.by_risk.get(key, 0) %}
+        <div class="hbar-row">
+          <span class="hbar-label">{{ label }}</span>
+          <div class="hbar-track"><div class="hbar-fill {{ key }}" style="width: {{ (n / risk_max * 100) if risk_max else 0 }}%" title="{{ RISK_TEXT[key] }}: {{ '{:,}'.format(n) }}"></div></div>
+          <span class="hbar-value">{{ '{:,}'.format(n) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card chart">
+      <h2>Publisher trust</h2>
+      <div class="hbars">
+        {% for key, label in trust_order %}
+        {% set n = stats.by_trust.get(key, 0) %}
+        <div class="hbar-row">
+          <span class="hbar-label">{{ label }}</span>
+          <div class="hbar-track"><div class="hbar-fill trust-{{ key }}" style="width: {{ (n / trust_max * 100) if trust_max else 0 }}%" title="{{ TRUST_TEXT[key] }}: {{ '{:,}'.format(n) }}"></div></div>
+          <span class="hbar-value">{{ '{:,}'.format(n) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card chart chart-wide">
+      <h2>Top categories</h2>
+      <div class="hbars">
+        {% for name, n in categories %}
+        <div class="hbar-row">
+          <span class="hbar-label">{{ name }}</span>
+          <div class="hbar-track"><div class="hbar-fill accent" style="width: {{ (n / cat_max * 100) if cat_max else 0 }}%" title="{{ name }}: {{ '{:,}'.format(n) }}"></div></div>
+          <span class="hbar-value">{{ '{:,}'.format(n) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card chart chart-wide">
+      <h2>Discovered per day, last 30 days</h2>
+      {% set day_max = (daily | map(attribute=1) | max) if daily else 1 %}
+      <div class="daychart">
+        {% for day, n in daily %}
+        <div class="daybar-col">
+          <div class="daybar" style="height: {{ ((n / day_max * 100) if day_max else 0) | round(1) }}%" title="{{ day }}: {{ n }} new"></div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="daychart-axis">
+        <span>{{ daily[0][0] if daily else '' }}</span>
+        <span>{{ daily[-1][0] if daily else '' }}</span>
+      </div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Recent crawl runs</h2>
+    <table class="runs">
+      <thead><tr><th>Source</th><th>Started</th><th>Status</th><th>Found</th><th>Updated</th><th>Skipped</th><th>Errors</th></tr></thead>
+      <tbody>
+        {% for r in runs %}
+        <tr class="{{ 'running' if not r.finished_at }}">
+          <td>{{ r.source }}</td>
+          <td>{{ r.started_at|nicedate('%b %d, %H:%M') }}</td>
+          <td>
+            {% if not r.finished_at %}<span class="pill yellow">running</span>
+            {% else %}{{ ((r.finished_at - r.started_at).total_seconds() / 60) | round(1) }} min{% endif %}
+          </td>
+          <td>{{ '{:,}'.format(r.found) }}</td>
+          <td>{{ '{:,}'.format(r.updated) }}</td>
+          <td>{{ '{:,}'.format(r.skipped) }}</td>
+          <td>{% if r.errors %}<span class="pill red">{{ r.errors|length }}</span>{% else %}0{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

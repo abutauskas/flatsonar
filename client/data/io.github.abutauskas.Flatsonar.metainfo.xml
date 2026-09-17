@@ -8,7 +8,7 @@
   <developer id="io.github.abutauskas"><name>abutauskas</name></developer>
   <description>
     <p>
-      Flatsonar is F-Droid for Linux. It finds open-source Flatpak apps wherever they live:
+      Flatsonar finds open-source Flatpak apps wherever they live:
       Flathub, GitHub, GitLab, Codeberg, project-hosted remotes and release bundles,
       and puts them in one store. Every listing credits the original creators and
       shows a sponsor button.

@@ -6,13 +6,15 @@ JSON API uses, so the website never lists an app the client would not."""
 from __future__ import annotations
 
 import re
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 from sqlalchemy import select
@@ -29,7 +31,7 @@ router = APIRouter(include_in_schema=False)
 
 SITE = {
     "name": "Flatsonar",
-    "tagline": "F-Droid for Linux",
+    "tagline": "Open-source Flatpak apps, hunted from everywhere",
     "repo": "https://github.com/abutauskas/flatsonar",
     "issues": "https://github.com/abutauskas/flatsonar/issues",
     "version": "0.1.0",
@@ -211,6 +213,30 @@ def app_page(request: Request, app_id: str, db: Session = Depends(get_session)):
 @router.get("/about", response_class=HTMLResponse)
 def about(request: Request, db: Session = Depends(get_session)):
     return render(request, "about.html", stats=catalogue.catalogue_stats(db))
+
+
+_admin_auth = HTTPBasic(auto_error=False)
+
+
+def require_admin(credentials: HTTPBasicCredentials | None = Depends(_admin_auth)) -> None:
+    """Gates /admin/analytics. Fails closed: no ADMIN_TOKEN configured means the
+    route 404s, not that it's open. Username is ignored; the password is the token,
+    compared with a timing-safe check."""
+    if not settings.admin_token:
+        raise HTTPException(404, "Not Found")
+    valid = credentials is not None and secrets.compare_digest(credentials.password, settings.admin_token)
+    if not valid:
+        raise HTTPException(401, "Unauthorized", headers={"WWW-Authenticate": "Basic"})
+
+
+@router.get("/admin/analytics", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
+def analytics(request: Request, db: Session = Depends(get_session)):
+    """Never linked from the nav, never built into the static GitHub Pages export
+    (see web/build.py's page list). Requires ADMIN_TOKEN; see require_admin above."""
+    return render(request, "analytics.html", stats=catalogue.catalogue_stats(db),
+                  categories=catalogue.category_counts(db)[:10],
+                  daily=catalogue.discoveries_by_day(db, 30),
+                  runs=catalogue.crawl_history(db, 40))
 
 
 def render_404(request: Request) -> HTMLResponse:

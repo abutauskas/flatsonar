@@ -8,7 +8,7 @@ import logging
 import sys
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from ..db import SessionLocal, init_db
 from ..models import CrawlRun, utcnow
@@ -111,7 +111,18 @@ async def crawl(source: Source, ctx: CrawlContext, limit: int | None, commit_eve
                     log.info("%s: +%d new, %d updated, %d skipped", source.name, run.found, run.updated, run.skipped)
         finally:
             run.finished_at = utcnow()
-            _safe_commit(db, run, "final")
+            if not _safe_commit(db, run, "final"):
+                # The final commit can fail on a leftover pending candidate from this
+                # same batch (two forks landing on the same app_id in one flush,
+                # tripping the unique constraint) - _safe_commit's rollback discards
+                # that together with the finished_at we just set. That must not cost
+                # us marking the run finished, or it looks "running" forever and
+                # blocks a future crawl for this source (see _already_running).
+                db.execute(update(CrawlRun).where(CrawlRun.id == run.id).values(
+                    finished_at=run.finished_at, found=run.found, updated=run.updated,
+                    skipped=run.skipped, errors=run.errors,
+                ))
+                db.commit()
     return run
 
 

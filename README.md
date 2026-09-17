@@ -1,6 +1,6 @@
 # Flatsonar
 
-**F-Droid for Linux.** Flatsonar hunts down open-source Flatpak apps wherever they
+**Hunted, not submitted.** Flatsonar hunts down open-source Flatpak apps wherever they
 live (Flathub, GitHub, GitLab, Codeberg, project-hosted remotes, `.flatpak`
 bundles attached to releases) and puts them in one store. Every listing
 credits the original creators and shows a **Sponsor** button.
@@ -27,7 +27,7 @@ looks off it asks you to press **Sure** twice. After that, it's your call.
 python -m venv .venv
 . .venv/Scripts/activate        # Linux: . .venv/bin/activate
 pip install -e core -e server
-cp server/.env.example server/.env   # add GITHUB_TOKEN for off-Flathub hunting
+echo "GITHUB_TOKEN=ghp_..." > server/.env   # off-Flathub hunting needs it; see below for the rest
 python -m flatsonar_server.crawler.run --source flathub --limit 100
 uvicorn flatsonar_server.main:app --reload
 ```
@@ -247,8 +247,8 @@ whatever GitHub Actions injects automatically as `GITHUB_TOKEN` (enough to hunt
 GitHub without any setup). For higher rate limits, or to hunt GitLab/Codeberg with
 a token, add repo secrets `CRAWLER_GITHUB_TOKEN`, `GITLAB_TOKEN`, `CODEBERG_TOKEN`
 (Settings → Secrets and variables → Actions); none need any scope beyond reading
-public data. Locally the same tokens go in `server/.env` (see
-`server/.env.example`).
+public data. Locally the same tokens go in `server/.env` (see the full list of
+settings, and their defaults, in `server/flatsonar_server/settings.py`).
 
 ## License
 

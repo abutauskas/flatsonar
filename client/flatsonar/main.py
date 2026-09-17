@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
                 developer_name="abutauskas",
                 version=VERSION,
                 license_type=Gtk.License.GPL_3_0,
-                comments="F-Droid for Linux: open-source Flatpak apps hunted from everywhere, with credit "
+                comments="Open-source Flatpak apps hunted from everywhere, with credit "
                          "to their creators and a warning before anything risky.",
                 website="https://github.com/abutauskas/flatsonar",
                 issue_url="https://github.com/abutauskas/flatsonar/issues",

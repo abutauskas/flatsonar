@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
     site_url: str | None = None  # public origin for sitemap/feed links, e.g. https://flatsonar.org
     user_agent: str = "Flatsonar/0.1 (+https://github.com/abutauskas/flatsonar)"
+    # Gates /admin/analytics. Unset (the default) disables the route entirely -
+    # it 404s rather than falling open. Set to a long random value to enable it.
+    admin_token: str | None = None
 
 
 settings = Settings()

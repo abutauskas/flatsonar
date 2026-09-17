@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "flatsonar"
 version = "0.1.0"
-description = "Flatsonar desktop client: an F-Droid-style store for open-source Flatpak apps (GTK4 + libadwaita)"
+description = "Flatsonar desktop client: an open-source Flatpak store (GTK4 + libadwaita)"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.12"
 # PyGObject itself comes from the distro (python3-gi); pip can't sensibly build it.
