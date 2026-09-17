@@ -6,6 +6,9 @@ import argparse
 import asyncio
 import logging
 import sys
+from datetime import timedelta
+
+from sqlalchemy import select
 
 from ..db import SessionLocal, init_db
 from ..models import CrawlRun, utcnow
@@ -13,6 +16,24 @@ from ..settings import settings
 from .base import CrawlContext, Skipped, Source, upsert_candidate
 
 log = logging.getLogger("flatsonar.crawler.run")
+
+# How long an unfinished CrawlRun is trusted as "still genuinely running" before
+# it is treated as abandoned. Real per-source crawls finish in minutes; this is
+# generous headroom, not a target. A row can outlive its process (killed rather
+# than let through its own `finally`, a crash, a host reboot mid-run) and sit
+# with finished_at=NULL forever otherwise, permanently blocking that source.
+STALE_RUN_AFTER = timedelta(hours=2)
+
+
+def _already_running(db, source_name: str) -> CrawlRun | None:
+    """An unfinished, still-plausibly-live CrawlRun for this source, if any."""
+    cutoff = utcnow() - STALE_RUN_AFTER
+    return db.scalar(
+        select(CrawlRun)
+        .where(CrawlRun.source == source_name, CrawlRun.finished_at.is_(None), CrawlRun.started_at >= cutoff)
+        .order_by(CrawlRun.started_at.desc())
+        .limit(1)
+    )
 
 
 def build_sources(names: list[str]) -> list[Source]:
@@ -53,8 +74,13 @@ def _safe_commit(db, run: CrawlRun, what: str) -> bool:
 
 
 async def crawl(source: Source, ctx: CrawlContext, limit: int | None, commit_every: int = 25) -> CrawlRun:
-    run = CrawlRun(source=source.name)
     with SessionLocal() as db:
+        existing = _already_running(db, source.name)
+        if existing is not None:
+            log.warning("%s: a crawl started %s is still marked running; skipping this one "
+                        "rather than duplicate its work", source.name, existing.started_at)
+            return existing
+        run = CrawlRun(source=source.name)
         db.add(run)
         db.commit()
         pending = 0

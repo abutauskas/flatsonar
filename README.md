@@ -1,8 +1,8 @@
 # Flatsonar
 
 **F-Droid for Linux.** Flatsonar hunts down open-source Flatpak apps wherever they
-live — Flathub, GitHub, GitLab, Codeberg, project-hosted remotes, `.flatpak`
-bundles attached to releases — and puts them in one store. Every listing
+live (Flathub, GitHub, GitLab, Codeberg, project-hosted remotes, `.flatpak`
+bundles attached to releases) and puts them in one store. Every listing
 credits the original creators and shows a **Sponsor** button.
 
 You can install anything, from anyone: verified developers, community packagers,
@@ -15,9 +15,9 @@ looks off it asks you to press **Sure** twice. After that, it's your call.
 
 | Directory | What | Runs on |
 |-----------|------|---------|
-| `core/`   | `flatsonar_core` — manifest parsing, risk scoring, SPDX allow-list | anywhere |
-| `server/` | `flatsonar_server` — FastAPI JSON API, the website, and the crawler ("the hunt") | anywhere |
-| `client/` | `flatsonar` — GTK4 / libadwaita desktop app | Linux (WSL2 + WSLg is fine for dev) |
+| `core/`   | `flatsonar_core`: manifest parsing, risk scoring, SPDX allow-list | anywhere |
+| `server/` | `flatsonar_server`: FastAPI JSON API, the website, and the crawler ("the hunt") | anywhere |
+| `client/` | `flatsonar`: GTK4 / libadwaita desktop app | Linux (WSL2 + WSLg is fine for dev) |
 
 ## Quick start
 
@@ -193,17 +193,19 @@ every page once with the live app's own templates and writes them to disk. The o
 thing a static host cannot do is run the `/apps` search/filter query server-side,
 so that page ships every open-source app in the HTML (search engines and no-JS
 visitors see the whole catalogue) and `site.js` filters, sorts and paginates over
-it client-side instead — same look, same URLs (`?category=`, `?risk=`, ...), no
+it client-side instead: same look, same URLs (`?category=`, `?risk=`, ...), no
 server. `/api` has no static equivalent; `/apps.json` is a flat dump of the same
 summary fields as a fallback, linked from the footer.
 
 `.github/workflows/pages.yml` does this automatically: it crawls (see "Keeping it
-fresh" below), builds, and deploys to `https://<user>.github.io/<repo>/` via
-GitHub's official Pages Actions. It needs **Settings → Pages → Source → GitHub
-Actions** enabled once, and it commits the refreshed `server/flatsonar.db` back to
-the branch after every crawl (deliberately un-ignored in `.gitignore`) so
-`first_seen` dates, the "new in the catalogue" section and the Atom feed survive
-between runs.
+fresh" below), builds, and deploys to `https://<user>.github.io/<repo>/` (or a
+custom domain set in the `SITE_URL` repository variable) via GitHub's official
+Pages Actions. It needs **Settings → Pages → Source → GitHub Actions** enabled
+once, plus a `DATABASE_URL` repo secret pointing at the same Postgres database
+the live server uses (a Supabase connection-pooler URL, not the direct one:
+GitHub's runners have no IPv6, and the direct URL is often IPv6-only). That
+database, not the repo, is what keeps `first_seen` dates, the "new in the
+catalogue" section and the Atom feed meaningful between runs.
 
 ## Hunting
 
@@ -226,7 +228,7 @@ like everyone else and labelled honestly.
 GitLab hunting is not limited to gitlab.com: `settings.gitlab_instances` (env
 `GITLAB_INSTANCES`) also walks gitlab.gnome.org, invent.kde.org,
 gitlab.freedesktop.org and gitlab.xfce.org by default, since that is where a
-meaningful share of desktop Linux software actually lives — self-hosted instances
+meaningful share of desktop Linux software actually lives. Self-hosted instances
 never show up in a gitlab.com-only search.
 
 A crawl commit is resilient by design: one manifest that fails to *commit* (as
@@ -241,8 +243,8 @@ being silent or fatal.
 `--limit` exists for a quick local smoke test; a real catalogue wants a full,
 unlimited, scheduled crawl. `.github/workflows/pages.yml` runs one weekly
 (`workflow_dispatch` for an on-demand run, with an optional `limit` input) using
-whatever GitHub Actions injects automatically as `GITHUB_TOKEN` — enough to hunt
-GitHub without any setup. For higher rate limits, or to hunt GitLab/Codeberg with
+whatever GitHub Actions injects automatically as `GITHUB_TOKEN` (enough to hunt
+GitHub without any setup). For higher rate limits, or to hunt GitLab/Codeberg with
 a token, add repo secrets `CRAWLER_GITHUB_TOKEN`, `GITLAB_TOKEN`, `CODEBERG_TOKEN`
 (Settings → Secrets and variables → Actions); none need any scope beyond reading
 public data. Locally the same tokens go in `server/.env` (see
@@ -251,4 +253,4 @@ public data. Locally the same tokens go in `server/.env` (see
 ## License
 
 GPL-3.0-or-later. Every app listed in Flatsonar belongs to its own authors under
-its own license — Flatsonar just points at them.
+its own license. Flatsonar just points at them.

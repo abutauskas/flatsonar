@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import app_grid %}
-{% block title %}{% if q %}“{{ q }}” — {% elif category %}{{ category }} apps — {% endif %}Apps — {{ site.name }}{% endblock %}
+{% block title %}{% if q %}“{{ q }}” - {% elif category %}{{ category }} apps - {% endif %}Apps - {{ site.name }}{% endblock %}
 {% block description %}Browse {{ total }} open-source Flatpak apps{% if category %} in {{ category }}{% endif %}, with sandbox risk and publisher trust for each.{% endblock %}
 {% block topsearch %}{% endblock %}
 
@@ -52,7 +52,7 @@
     {% else %}
       <div class="empty">
         <h3>No apps found</h3>
-        <p>Try another search or loosen the filters. The hunt is ongoing — <a href="/feed.xml">follow the feed</a> for new finds.</p>
+        <p>Try another search or loosen the filters. The hunt is ongoing: <a href="/feed.xml">follow the feed</a> for new finds.</p>
       </div>
     {% endif %}
 

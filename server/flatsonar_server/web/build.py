@@ -2,7 +2,7 @@
 
     python -m flatsonar_server.web.build --out ../public --site-url https://abutauskas.github.io/flatsonar
 
-Reuses the live app's exact templates, catalogue queries and static assets — the
+Reuses the live app's exact templates, catalogue queries and static assets. The
 dynamic ``uvicorn`` app is never touched and this never writes to the database.
 The one thing that cannot carry over is server-side search/filter/sort on
 ``/apps``: GitHub Pages has no server to run that query against, so every
@@ -55,7 +55,7 @@ class _URL:
 @dataclass
 class FakeRequest:
     """Just enough of Starlette's ``Request`` for the templates to render: a
-    logical, base-path-free path (``/apps``, never ``/flatsonar/apps`` — the base
+    logical, base-path-free path (``/apps``, never ``/flatsonar/apps``; the base
     path is applied afterward, uniformly, by :func:`_prefix_base_path`) and no
     query string. The static catalogue page has no server-side filters; its JS
     reads the real ``location.search`` in the visitor's browser instead."""

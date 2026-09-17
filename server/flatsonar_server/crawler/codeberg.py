@@ -51,7 +51,7 @@ class GiteaForge:
             page = 1
             while len(seen) < budget:
                 url = (f"{self.api}/repos/search?q={q}&topic={topic}&sort=stars&order=desc"
-                       f"&limit=50&page={page}")
+                       f"&private=false&limit=50&page={page}")
                 data = await ctx.fetch_json(url, self._headers())
                 items = (data or {}).get("data") or []
                 if not items:
@@ -60,6 +60,10 @@ class GiteaForge:
                     if r["full_name"] in seen:
                         continue
                     seen.add(r["full_name"])
+                    # Belt and braces on top of private=false above: a token that can see
+                    # private repos must never let one reach the public catalogue.
+                    if r.get("private"):
+                        continue
                     yield self._repo_info(r)
                     if len(seen) >= budget:
                         return

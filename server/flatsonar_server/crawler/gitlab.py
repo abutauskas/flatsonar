@@ -52,7 +52,7 @@ class GitLabForge:
             page = 1
             while len(seen) < budget:
                 url = (f"{self.api}/projects?{search}&order_by=star_count&sort=desc&simple=false"
-                       f"&archived=false&per_page=100&page={page}")
+                       f"&archived=false&visibility=public&per_page=100&page={page}")
                 data = await ctx.fetch_json(url, self._headers())
                 if not data:
                     break
@@ -61,6 +61,11 @@ class GitLabForge:
                     if not full or full in seen:
                         continue
                     seen.add(full)
+                    # Belt and braces on top of visibility=public above: a token that can
+                    # see private/internal projects (e.g. one scoped beyond public data)
+                    # must never let one reach the public catalogue as a "candidate".
+                    if p.get("visibility") != "public":
+                        continue
                     yield self._repo_info(p)
                     if len(seen) >= budget:
                         return

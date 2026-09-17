@@ -120,6 +120,14 @@ class CrawlContext:
             for attempt in range(3):
                 try:
                     resp = await self.client.get(url, headers=hdrs)
+                except httpx.ConnectError as exc:
+                    # DNS failures and refused/unreachable connections are not transient:
+                    # a dead or misconfigured host (a stale well-known domain, a repo's
+                    # long-abandoned homepage, ...) will not resolve a second later, and
+                    # retrying it 3x with backoff for every one of thousands of candidates
+                    # is what turns "a few bad domains" into a crawl that visibly stalls.
+                    log.debug("GET %s failed (not retrying, connect error): %s", url, exc)
+                    return Fetched(0, "", httpx.Headers())
                 except httpx.HTTPError as exc:
                     if attempt == 2:
                         log.warning("GET %s failed: %s", url, exc)

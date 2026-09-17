@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, risk_pill, trust_pill %}
-{% block title %}{{ app.name }} — {{ site.name }}{% endblock %}
+{% block title %}{{ app.name }} - {{ site.name }}{% endblock %}
 {% block description %}{{ app.summary or (app.name ~ ' on ' ~ site.name) }}{% endblock %}
 {% block head %}
 <link rel="canonical" href="{{ base_url(request) }}/apps/{{ app.app_id }}">

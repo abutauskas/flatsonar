@@ -10,8 +10,8 @@
     <p class="kicker">Open-source Flatpak apps, hunted from everywhere</p>
     <h1>F-Droid for Linux.</h1>
     <p class="lede">
-      {{ site.name }} finds open-source apps wherever they live — Flathub, GitHub, GitLab, Codeberg,
-      project remotes, release bundles — and puts them in one store. Every listing credits the
+      {{ site.name }} finds open-source apps wherever they live (Flathub, GitHub, GitLab, Codeberg,
+      project remotes, release bundles) and puts them in one store. Every listing credits the
       people who made it. Anything risky gets explained, and you are asked twice before it runs.
     </p>
     <form class="hero-search" action="/apps" role="search">
@@ -61,7 +61,7 @@
   <div class="trust-grid">
     <article class="tcard verified"><h3>Verified</h3><p>The creator demonstrably controls the id: Flathub verification, or the hosting account owns the namespace, or their domain serves a well-known file listing it.</p></article>
     <article class="tcard reviewed"><h3>Reviewed</h3><p>On Flathub: the manifest went through review and Flathub built it, but the developer has not verified the id.</p></article>
-    <article class="tcard unverified"><h3>Unverified</h3><p>Off Flathub and ownership could not be confirmed. Nothing known against it — you are told before installing.</p></article>
+    <article class="tcard unverified"><h3>Unverified</h3><p>Off Flathub and ownership could not be confirmed. Nothing known against it, but you are told before installing.</p></article>
     <article class="tcard suspicious"><h3>Suspicious</h3><p>A concrete red flag: an id claiming a namespace the repo neither owns nor builds from, or a build that does things a build should not.</p></article>
   </div>
 </section>
@@ -110,8 +110,8 @@
   <div class="getbox">
     <div>
       <h2>Get {{ site.name }}</h2>
-      <p class="sub">A GTK4 desktop app for Linux that installs through the two-gate check — pull, unpack, scan, re-score, ask twice, deploy — and shows you what is already installed with the same scoring.</p>
-      <p class="fine">Early days: it runs from source today. A Flatpak of {{ site.name }} itself is coming (and scores <strong>red</strong> by its own rules — a store has to talk to <code>org.freedesktop.Flatpak</code>).</p>
+      <p class="sub">A GTK4 desktop app for Linux that installs through the two-gate check (pull, unpack, scan, re-score, ask twice, deploy) and shows you what is already installed with the same scoring.</p>
+      <p class="fine">Early days: it runs from source today. A Flatpak of {{ site.name }} itself is coming (and scores <strong>red</strong> by its own rules: a store has to talk to <code>org.freedesktop.Flatpak</code>).</p>
     </div>
     <div class="cmd" data-copy><code>git clone {{ site.repo }}.git &amp;&amp; cd flatsonar
 ./scripts/setup-wsl.sh            # GTK4, libadwaita, flatpak, clamav

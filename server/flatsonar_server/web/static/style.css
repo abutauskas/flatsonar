@@ -193,7 +193,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .tcard.unverified { border-top-color: var(--yellow); }
 .tcard.suspicious { border-top-color: var(--red); }
 .get { padding-bottom: 72px; }
-.getbox { display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 36px; }
+.getbox { display: grid; grid-template-columns: .7fr 1.3fr; gap: 28px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 30px 36px; }
 .getbox .sub { margin-bottom: .8em; }
 
 /* --- app cards -------------------------------------------------------------------- */
@@ -272,7 +272,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .panel .option:first-of-type h4 { margin-top: 0; }
 .panel .tip { border-top: 1px solid var(--border); padding-top: 14px; margin: 18px 0 0; }
 .cmd { display: flex; align-items: flex-start; gap: 10px; background: var(--code-bg); color: var(--code-ink); border-radius: 10px; padding: 10px 10px 10px 14px; margin: 8px 0; }
-.cmd code { flex: 1; min-width: 0; font: .84rem/1.5 var(--mono); background: none; padding: 2px 0; color: inherit; white-space: pre; display: block; overflow-x: auto; }
+.cmd code { flex: 1; min-width: 0; font: .84rem/1.5 var(--mono); background: none; padding: 2px 0; color: inherit; white-space: pre-wrap; overflow-wrap: anywhere; display: block; }
 .cmd .copy { flex: none; font: 600 .74rem var(--font); color: var(--code-ink); background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .15); border-radius: 6px; padding: 4px 9px; cursor: pointer; }
 .cmd .copy:hover { background: rgba(255, 255, 255, .18); }
 .cmd .copy.done { background: rgba(45, 212, 191, .3); border-color: rgba(45, 212, 191, .5); }

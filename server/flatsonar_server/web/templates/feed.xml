@@ -13,7 +13,7 @@
     <updated>{{ app.first_seen|isodate }}</updated>
     {% if app.developer_name %}<author><name>{{ app.developer_name }}</name></author>{% endif %}
     <summary>{{ app.summary }}</summary>
-    <content type="text">{{ app.summary }} — {{ RISK_TEXT.get(app.risk_level, app.risk_level) }}, {{ TRUST_TEXT.get(app.trust, app.trust) }}{% if app.license %}, {{ app.license }}{% endif %}.</content>
+    <content type="text">{{ app.summary }}. {{ RISK_TEXT.get(app.risk_level, app.risk_level) }}, {{ TRUST_TEXT.get(app.trust, app.trust) }}{% if app.license %}, {{ app.license }}{% endif %}.</content>
     {% for c in app.categories or [] %}<category term="{{ c }}" />{% endfor %}
   </entry>
 {% endfor %}</feed>

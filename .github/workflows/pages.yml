@@ -1,27 +1,25 @@
 name: Crawl and publish
 
 # Hunt Flatpak apps, rebuild the static site, and deploy it to GitHub Pages at
-# https://<owner>.github.io/flatsonar/.
+# https://<owner>.github.io/flatsonar/ (or the custom domain in the SITE_URL
+# repository variable, once one is set).
 #
 # - schedule / workflow_dispatch: always run the crawl (that's the whole point of
-#   the schedule — a catalogue that stays fresh without anyone running it by hand).
-# - push: rebuilds and redeploys the site from whatever is already in
-#   server/flatsonar.db, without re-crawling, so a template/CSS/code change shows
-#   up immediately instead of waiting for the next scheduled crawl.
+#   the schedule: a catalogue that stays fresh without anyone running it by hand).
+# - push: rebuilds and redeploys the site from whatever is already in the
+#   database, without re-crawling, so a template/CSS/code change shows up
+#   immediately instead of waiting for the next scheduled crawl.
 #
-# The crawl commits the refreshed server/flatsonar.db back to this branch (see
-# .gitignore: it is deliberately tracked) so first_seen dates, the "new in the
-# catalogue" section and the Atom feed survive between runs instead of every app
-# looking "new" on every run. `paths-ignore` on the push trigger stops that commit
-# from re-triggering this workflow: it touches nothing else, so GitHub never even
-# starts a run for it. `[skip ci]` in the message is just a documented convention
-# on top, in case something else ever watches this repo's commits.
+# The crawl writes straight to the Postgres database at DATABASE_URL (a repo
+# secret; the Supabase connection-pooler URL, not the direct one, since GitHub's
+# runners don't have IPv6). That database is what keeps first_seen dates, the
+# "new in the catalogue" section and the Atom feed meaningful between runs, the
+# same one the live server uses, so this workflow has nothing of its own to
+# persist or commit back to the repo.
 
 on:
   push:
     branches: [master, main]
-    paths-ignore:
-      - "server/flatsonar.db"
   schedule:
     - cron: "17 6 * * 1"  # Mondays 06:17 UTC; a full crawl is heavier than it needs
                           # to be to run daily, see README > Hunting > Keeping it fresh
@@ -36,7 +34,6 @@ on:
         required: false
 
 permissions:
-  contents: write
   pages: write
   id-token: write
 
@@ -45,7 +42,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+  # Set the SITE_URL repository variable once a custom domain is live (Settings ->
+  # Secrets and variables -> Actions -> Variables) to point the sitemap and feed at
+  # it; until then this falls back to the default github.io project-page address.
+  SITE_URL: ${{ vars.SITE_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
 jobs:
   build:
@@ -58,7 +59,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install
-        run: pip install -e core -e server
+        run: pip install -e core -e "server[postgres]"
 
       - name: Crawl
         if: github.event_name != 'push' && (github.event_name != 'workflow_dispatch' || inputs.crawl)
@@ -76,22 +77,8 @@ jobs:
           python -m flatsonar_server.crawler.run --source all --concurrency 12 -v \
             ${LIMIT:+--limit "$LIMIT"}
 
-      - name: Checkpoint the database
-        if: github.event_name != 'push' && (github.event_name != 'workflow_dispatch' || inputs.crawl)
-        working-directory: server
-        run: python -c "import sqlite3; c = sqlite3.connect('flatsonar.db'); c.execute('PRAGMA wal_checkpoint(FULL)'); c.close()"
-
       - name: Build the static site
         run: python -m flatsonar_server.web.build --out public --site-url "$SITE_URL"
-
-      - name: Commit the refreshed catalogue
-        if: github.event_name != 'push' && (github.event_name != 'workflow_dispatch' || inputs.crawl)
-        run: |
-          git config user.name "flatsonar-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add server/flatsonar.db
-          git diff --cached --quiet server/flatsonar.db || git commit -m "Crawl: refresh catalogue [skip ci]"
-          git push
 
       - uses: actions/upload-pages-artifact@v3
         with:
