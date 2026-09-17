@@ -28,7 +28,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from .. import catalogue
 from ..db import SessionLocal, init_db
@@ -120,7 +120,13 @@ class Builder:
         self.render("index.html", "/", stats=stats, newest=newest, loved=loved, hunted=hunted,
                    categories=categories[:12])
 
-        all_apps, total = catalogue.page_apps(db, catalogue.apps_query(), "name", 1, ALL)
+        # Eager-load once for all apps, not per app: _build_app_page used to call
+        # catalogue.get_app() (a selectinload per app) inside the loop below, which
+        # is the right shape for a single live request but turns into thousands of
+        # extra round trips here. Fine against local SQLite; against a remote
+        # Postgres it was the whole difference between a ~13s build and 15+ minutes.
+        all_apps_stmt = catalogue.apps_query().options(selectinload(App.sources), selectinload(App.manifest))
+        all_apps, total = catalogue.page_apps(db, all_apps_stmt, "name", 1, ALL)
         self.render("apps_static.html", "/apps", apps=all_apps, total=total, categories=categories)
         self.render("about.html", "/about", stats=stats)
         self.render("404.html", "/404", dest_name="404.html", what="That page does not exist")
@@ -133,12 +139,12 @@ class Builder:
         self._write_robots()
         self._write_apps_json(all_apps)
         for i, app in enumerate(all_apps):
-            self._build_app_page(db, app)
+            self._build_app_page(app)
             if (i + 1) % 200 == 0:
                 log.info("rendered %d/%d app pages", i + 1, len(all_apps))
 
-    def _build_app_page(self, db: Session, app: App) -> None:
-        full = catalogue.get_app(db, app.app_id)
+    def _build_app_page(self, app: App) -> None:
+        full = app  # already eager-loaded with sources + manifest, see _build_pages
         manifest_href = "manifest.json" if full.manifest else None
         perms = _sorted_findings(full.permissions)
         self.render("app.html", f"/apps/{app.app_id}", app=full, findings=_sorted_findings(full.trust_findings),
