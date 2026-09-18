@@ -117,11 +117,21 @@ def get_app(db: Session, app_id: str) -> App | None:
                      .where(App.app_id == app_id))
 
 
+# freedesktop.org's category registry (specifications.freedesktop.org/menu-spec)
+# includes toolkit/platform markers under "Additional Categories" - "application
+# based on GTK+ libraries" and the like - which describe implementation, not
+# content, so they make poor browsing categories. X- prefixed categories are the
+# spec's own vendor-specific extension namespace: arbitrary per app, never a
+# shared taxonomy, not in the registry at all.
+_NOT_A_BROWSE_CATEGORY = {"Qt", "GTK", "GNOME", "KDE", "COSMIC", "LXQt", "XFCE", "DDE", "Motif", "Java", "ConsoleOnly", "Core"}
+
+
 def category_counts(db: Session) -> list[tuple[str, int]]:
     counter: Counter[str] = Counter()
     for cats in db.scalars(select(App.categories).where(App.is_oss.is_(True))):
         counter.update(cats or [])
-    return counter.most_common()
+    return [(name, count) for name, count in counter.most_common()
+            if name not in _NOT_A_BROWSE_CATEGORY and not name.startswith("X-")]
 
 
 def discoveries_by_day(db: Session, days: int = 30) -> list[tuple[str, int]]:
