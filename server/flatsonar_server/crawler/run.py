@@ -145,25 +145,8 @@ async def _crawl_one(source: Source, ctx: CrawlContext, limit: int | None) -> st
     return None
 
 
-def _remove_placeholder_apps() -> None:
-    """One-time cleanup: gitlab.com/abdulrahman305/flatpak-builder-lint's test
-    fixtures were crawled as 24 real apps before candidates_from_repo() started
-    rejecting this exact placeholder metadata. Safe to run repeatedly (no-op once
-    they're gone); remove this call once confirmed clean on the live database."""
-    from ..models import App
-
-    with SessionLocal() as db:
-        rows = list(db.scalars(select(App).where(App.name == "Example", App.summary == "A summary")))
-        for app in rows:
-            db.delete(app)
-        db.commit()
-        if rows:
-            log.info("removed %d placeholder app(s) left over from flatpak-builder-lint's test fixtures", len(rows))
-
-
 async def amain(args: argparse.Namespace) -> int:
     init_db()
-    _remove_placeholder_apps()
     ctx = CrawlContext(concurrency=args.concurrency)
     try:
         # Each source hits a different host and already paces itself (per-host rate
