@@ -70,7 +70,11 @@ def _add_missing_columns(eng) -> None:
                 if isinstance(col.type, JSON):
                     ddl += " DEFAULT '[]'"  # every JSON column here is a list
                 elif isinstance(default, bool):
-                    ddl += f" DEFAULT {int(default)}"
+                    # Not str(default) or int(default): Postgres accepts the TRUE/FALSE
+                    # keywords for a BOOLEAN column but not "True"/"False" or a bare 0/1
+                    # (DatatypeMismatch, integer default on a boolean column). SQLite
+                    # (3.23+) accepts TRUE/FALSE as 1/0 too, so this works on both.
+                    ddl += f" DEFAULT {'TRUE' if default else 'FALSE'}"
                 elif isinstance(default, (int, float)):
                     ddl += f" DEFAULT {default}"
                 elif isinstance(default, str):
