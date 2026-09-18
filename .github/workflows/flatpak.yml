@@ -1,0 +1,53 @@
+name: Flatpak bundle
+
+# Builds the GTK client into a distributable .flatpak bundle from
+# client/io.github.abutauskas.Flatsonar.json. Runs in a container that already
+# has flatpak-builder and the org.gnome.Platform/Sdk//48 runtime baked in
+# (matching the manifest's runtime-version), since neither can run on a plain
+# Windows/macOS dev machine.
+#
+# - push/pull_request touching the client or core: build-only sanity check,
+#   bundle uploaded as a downloadable workflow artifact.
+# - release (published): also attaches the bundle to the GitHub Release, so it
+#   can be installed with `flatpak install flatsonar.flatpak`.
+# - workflow_dispatch: build on demand.
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "client/**"
+      - "core/**"
+      - ".github/workflows/flatpak.yml"
+  pull_request:
+    paths:
+      - "client/**"
+      - "core/**"
+      - ".github/workflows/flatpak.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write # only used by the release-attach step below
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: flatsonar.flatpak
+          manifest-path: client/io.github.abutauskas.Flatsonar.json
+
+      - name: Attach the bundle to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: flatsonar.flatpak
