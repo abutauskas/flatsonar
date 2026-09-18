@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
-# One-time setup for running the Flatsonar client inside WSL2 (Ubuntu) or any Debian-based distro.
+# One-time setup for running the Flatsonar client inside WSL2 (Ubuntu/Debian or Fedora).
 set -euo pipefail
 
-if ! command -v apt-get >/dev/null; then
-  echo "This script targets Debian/Ubuntu. Install the equivalents manually:" >&2
+if command -v apt-get >/dev/null; then
+  sudo apt-get update
+  sudo apt-get install -y \
+    python3 python3-pip python3-venv \
+    python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 \
+    flatpak gir1.2-flatpak-1.0 flatpak-builder ostree \
+    clamav clamav-freshclam \
+    libadwaita-1-0 gnome-icon-theme adwaita-icon-theme
+elif command -v dnf >/dev/null; then
+  sudo dnf install -y \
+    python3 python3-pip \
+    python3-gobject gtk4 libadwaita \
+    flatpak flatpak-builder ostree \
+    clamav clamav-freshclam \
+    adwaita-icon-theme
+else
+  echo "This script targets Debian/Ubuntu (apt) or Fedora (dnf). Install the equivalents manually:" >&2
   echo "  python3-gi gtk4 libadwaita flatpak flatpak-builder ostree clamav" >&2
   exit 1
 fi
-
-sudo apt-get update
-sudo apt-get install -y \
-  python3 python3-pip python3-venv \
-  python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 \
-  flatpak gir1.2-flatpak-1.0 flatpak-builder ostree \
-  clamav clamav-freshclam \
-  libadwaita-1-0 gnome-icon-theme adwaita-icon-theme
 
 # Flathub remote for the current user.
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
