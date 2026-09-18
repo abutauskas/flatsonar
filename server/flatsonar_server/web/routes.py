@@ -148,6 +148,7 @@ templates.env.filters["paragraphs"] = paragraphs
 templates.env.filters["funding_label"] = funding_label
 templates.env.filters["isodate"] = _dt
 templates.env.filters["nicedate"] = _nicedate
+templates.env.filters["browsable_categories"] = catalogue.browsable_categories
 templates.env.globals.update(
     site=SITE, RISK_TEXT=RISK_TEXT, RISK_TIP=RISK_TIP, TRUST_TEXT=TRUST_TEXT, TRUST_TIP=TRUST_TIP,
     SORT_LABELS=SORT_LABELS, RISK_FILTERS=RISK_FILTERS, TRUST_FILTERS=TRUST_FILTERS, WHERE_FILTERS=WHERE_FILTERS,

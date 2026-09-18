@@ -126,12 +126,22 @@ def get_app(db: Session, app_id: str) -> App | None:
 _NOT_A_BROWSE_CATEGORY = {"Qt", "GTK", "GNOME", "KDE", "COSMIC", "LXQt", "XFCE", "DDE", "Motif", "Java", "ConsoleOnly", "Core"}
 
 
+def is_browsable_category(name: str) -> bool:
+    return name not in _NOT_A_BROWSE_CATEGORY and not name.startswith("X-")
+
+
+def browsable_categories(categories: list[str] | None) -> list[str]:
+    """One app's own category list, with the same toolkit/vendor-tag filter the
+    catalogue sidebar uses - so an app page doesn't show a category (e.g. "Qt")
+    that a click-through would never find in the browse list."""
+    return [c for c in (categories or []) if is_browsable_category(c)]
+
+
 def category_counts(db: Session) -> list[tuple[str, int]]:
     counter: Counter[str] = Counter()
     for cats in db.scalars(select(App.categories).where(App.is_oss.is_(True))):
         counter.update(cats or [])
-    return [(name, count) for name, count in counter.most_common()
-            if name not in _NOT_A_BROWSE_CATEGORY and not name.startswith("X-")]
+    return [(name, count) for name, count in counter.most_common() if is_browsable_category(name)]
 
 
 def discoveries_by_day(db: Session, days: int = 30) -> list[tuple[str, int]]:
