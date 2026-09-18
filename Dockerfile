@@ -14,7 +14,7 @@ WORKDIR /app
 
 COPY core /app/core
 COPY server /app/server
-RUN pip install -e /app/core -e /app/server
+RUN pip install -e /app/core -e "/app/server[postgres]"
 
 ENV PORT=8000 DATABASE_URL=sqlite:////data/flatsonar.db CRAWL_CACHE_DIR=/data/crawl-cache
 RUN mkdir -p /data
