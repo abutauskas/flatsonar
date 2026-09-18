@@ -126,28 +126,38 @@ async def crawl(source: Source, ctx: CrawlContext, limit: int | None, commit_eve
     return run
 
 
+async def _crawl_one(source: Source, ctx: CrawlContext, limit: int | None) -> str | None:
+    """Runs one source to completion and logs its result. Returns its name on
+    failure, None on success, so :func:`amain` can gather every source without one
+    source's exception taking the others down with it (belt and braces on top of
+    :func:`crawl`'s own per-candidate recovery: a genuinely bad day for one forge -
+    it's down, a bug we have not hit yet - must not stop the rest)."""
+    log.info("crawling %s (limit=%s)", source.name, limit)
+    try:
+        run = await crawl(source, ctx, limit)
+    except Exception:
+        log.exception("%s crawl aborted", source.name)
+        return source.name
+    log.info(
+        "%s done: %d new, %d updated, %d skipped, %d errors",
+        source.name, run.found, run.updated, run.skipped, len(run.errors),
+    )
+    return None
+
+
 async def amain(args: argparse.Namespace) -> int:
     init_db()
     ctx = CrawlContext(concurrency=args.concurrency)
-    failed: list[str] = []
     try:
-        for source in build_sources(args.source):
-            log.info("crawling %s (limit=%s)", source.name, args.limit)
-            try:
-                run = await crawl(source, ctx, args.limit)
-            except Exception:
-                # Belt and braces on top of crawl()'s own recovery: one source having
-                # a genuinely bad day (the forge is down, a bug we have not hit yet)
-                # must not stop `--source all` from trying the rest.
-                log.exception("%s crawl aborted; moving on to the next source", source.name)
-                failed.append(source.name)
-                continue
-            log.info(
-                "%s done: %d new, %d updated, %d skipped, %d errors",
-                source.name, run.found, run.updated, run.skipped, len(run.errors),
-            )
+        # Each source hits a different host and already paces itself (per-host rate
+        # limiting, its own bounded worker pool), so running them side by side rather
+        # than one after another means one source's rate-limit wait no longer stalls
+        # the other three - they share the same concurrency budget but no longer sit
+        # fully idle while e.g. GitHub sleeps off a search rate limit.
+        results = await asyncio.gather(*(_crawl_one(s, ctx, args.limit) for s in build_sources(args.source)))
     finally:
         await ctx.close()
+    failed = [name for name in results if name]
     if failed:
         log.error("source(s) aborted: %s", ", ".join(failed))
     return 1 if failed else 0

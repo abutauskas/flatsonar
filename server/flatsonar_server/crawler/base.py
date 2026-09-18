@@ -116,9 +116,14 @@ class CrawlContext:
             if cached.get("last_modified"):
                 hdrs["If-Modified-Since"] = cached["last_modified"]
 
-        async with self.limiter.sem:
-            await self.limiter.wait(host)
-            for attempt in range(3):
+        for attempt in range(3):
+            # The semaphore wraps only the actual request, not any backoff sleep below:
+            # a rate-limited request can wait up to 15 minutes, and holding one of the
+            # 8 global concurrency slots for that whole wait starved every other
+            # in-flight fetch - including this source's own other workers - for no
+            # reason, since the slot isn't doing anything but sleeping.
+            async with self.limiter.sem:
+                await self.limiter.wait(host)
                 try:
                     resp = await self.client.get(url, headers=hdrs)
                 except httpx.ConnectError as exc:
@@ -133,21 +138,23 @@ class CrawlContext:
                     if attempt == 2:
                         log.warning("GET %s failed: %s", url, exc)
                         return Fetched(0, "", httpx.Headers())
-                    await asyncio.sleep(1.5 * (attempt + 1))
-                    continue
-                if resp.status_code in (403, 429) and "rate limit" in resp.text.lower():
-                    reset = resp.headers.get("x-ratelimit-reset") or resp.headers.get("retry-after")
-                    delay = 60.0
-                    if reset:
-                        try:
-                            v = float(reset)
-                            delay = max(1.0, v - time.time()) if v > 1e6 else v
-                        except ValueError:
-                            pass
-                    log.warning("rate limited by %s; sleeping %.0fs", host, min(delay, 900))
-                    await asyncio.sleep(min(delay, 900))
-                    continue
-                break
+                    resp = None
+            if resp is None:
+                await asyncio.sleep(1.5 * (attempt + 1))
+                continue
+            if resp.status_code in (403, 429) and "rate limit" in resp.text.lower():
+                reset = resp.headers.get("x-ratelimit-reset") or resp.headers.get("retry-after")
+                delay = 60.0
+                if reset:
+                    try:
+                        v = float(reset)
+                        delay = max(1.0, v - time.time()) if v > 1e6 else v
+                    except ValueError:
+                        pass
+                log.warning("rate limited by %s; sleeping %.0fs", host, min(delay, 900))
+                await asyncio.sleep(min(delay, 900))
+                continue
+            break
 
         if resp.status_code == 304 and cached:
             return Fetched(200, cached["body"], resp.headers, from_cache=True)
