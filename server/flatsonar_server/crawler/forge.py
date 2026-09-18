@@ -151,7 +151,7 @@ def _parse_flatpakrepo(text: str) -> tuple[str | None, str | None]:
 
 
 async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) -> list[Candidate]:
-    if repo.fork or repo.archived:
+    if repo.fork:
         return []
     if repo.owner.lower() == "flathub":
         return []  # packaging repos: handled by the Flathub source
@@ -234,6 +234,7 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
             forks=repo.forks,
             repo_created_at=repo.created_at,
             repo_pushed_at=repo.pushed_at,
+            archived=repo.archived,
             manifest=manifest,
             manifest_url=manifest_url,
             sources=sources,

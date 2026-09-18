@@ -54,6 +54,7 @@ class AppSummary(BaseModel):
     risk_level: str
     on_flathub: bool
     flathub_verified: bool
+    archived: bool = False  # the upstream repo is archived; the app may still work fine
     trust: str  # verified | reviewed | unverified | suspicious
     stars: int
     latest_version: str | None = None

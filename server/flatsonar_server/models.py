@@ -54,6 +54,7 @@ class App(Base):
     repo_pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     on_flathub: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     flathub_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)  # upstream repo is archived
 
     # Publisher trust (see flatsonar_core.provenance): verified / reviewed / unverified / suspicious,
     # plus the findings that led there (namespace check, repo age, manifest audit, collisions).

@@ -227,6 +227,7 @@ class Candidate:
     repo_pushed_at: datetime | None = None
     on_flathub: bool | None = None
     flathub_verified: bool | None = None
+    archived: bool | None = None
     manifest: Manifest | None = None
     manifest_url: str | None = None
     sources: list[SourceSpec] = field(default_factory=list)
@@ -335,12 +336,14 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App, bool]:
         for attr in ("upstream_url", "homepage", "developer_name", "icon_url", "repo_created_at", "repo_pushed_at"):
             if not getattr(app, attr) and getattr(cand, attr):
                 setattr(app, attr, getattr(cand, attr))
+        if cand.archived is not None:
+            app.archived = cand.archived
         return app, False
 
     for attr in (
         "name", "summary", "description", "icon_url", "screenshots", "categories", "license",
         "developer_name", "upstream_url", "homepage", "latest_version", "on_flathub", "flathub_verified",
-        "repo_created_at", "repo_pushed_at",
+        "archived", "repo_created_at", "repo_pushed_at",
     ):
         val = getattr(cand, attr)
         if val is not None and val != "" and val != []:

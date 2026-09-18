@@ -27,6 +27,7 @@
         {{ trust_pill(app.trust) }}
         {% if app.license %}<span class="pill" title="SPDX license">{{ app.license }}</span>{% endif %}
         {% if app.latest_version %}<span class="pill" title="Latest version">v{{ app.latest_version }}</span>{% endif %}
+        {% if app.archived %}<span class="pill" title="The upstream repository is archived; the app may still work fine">Archived</span>{% endif %}
       </div>
     </div>
     <div class="head-actions">
