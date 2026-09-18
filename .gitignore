@@ -28,6 +28,7 @@ public/
 .flatpak-builder/
 build-dir/
 repo/
+*.flatpak
 
 # Editors / OS
 .vscode/
