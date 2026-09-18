@@ -34,7 +34,12 @@ def make_engine(url: str | None = None):
 
 
 engine = make_engine()
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, class_=Session)
+# autoflush (the default) matters here: upsert_candidate's db.get(App, app_id) has to
+# see a same-app-id row added earlier in the *same* uncommitted batch, or two crawl
+# candidates for one id (e.g. the same app found on two different GitLab instances,
+# neither committed yet) both look "new" and collide on the primary key at commit time
+# instead of going through the existing collision handling in _guard_collision.
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=Session)
 
 
 def init_db(eng=None) -> None:
