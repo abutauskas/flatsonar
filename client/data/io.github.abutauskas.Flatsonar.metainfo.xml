@@ -11,7 +11,7 @@
       Flatsonar finds open-source Flatpak apps wherever they live:
       Flathub, GitHub, GitLab, Codeberg, project-hosted remotes and release bundles,
       and puts them in one store. Every listing credits the original creators and
-      links a way to support them.
+      shows a sponsor button.
     </p>
     <p>
       You can install anything. Flatsonar reads each app's sandbox permissions and runs

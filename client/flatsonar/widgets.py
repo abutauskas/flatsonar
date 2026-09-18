@@ -98,7 +98,7 @@ class AppCard(Gtk.Button):
         foot.append(risk_pill(app.risk_level))
         if app.has_funding:
             heart = Gtk.Image.new_from_icon_name("emblem-favorite-symbolic")
-            heart.set_tooltip_text("Has a way to support the creator")
+            heart.set_tooltip_text("Has a sponsor link")
             heart.add_css_class("accent")
             foot.append(heart)
         if app.trust != "reviewed":  # the common Flathub case stays quiet; everything else gets a mark

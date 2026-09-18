@@ -34,7 +34,7 @@
       {{ risk_pill(app.risk_level) }}
       {% if app.trust != 'reviewed' %}{{ trust_pill(app.trust) }}{% endif %}
       {% if app.archived %}<span class="pill" title="The upstream repository is archived; the app may still work fine">Archived</span>{% endif %}
-      {% if app.funding_links %}<span class="pill heart" title="Has a way to support the creator"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg>Support</span>{% endif %}
+      {% if app.funding_links %}<span class="pill heart" title="Has a sponsor link"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg>Sponsor</span>{% endif %}
     </div>
   </div>
 </a>

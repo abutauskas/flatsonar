@@ -3,7 +3,7 @@
 **Hunted, not submitted.** Flatsonar hunts down open-source Flatpak apps wherever they
 live (Flathub, GitHub, GitLab, Codeberg, project-hosted remotes, `.flatpak`
 bundles attached to releases) and puts them in one store. Every listing
-credits the original creators and links a way to support them.
+credits the original creators and shows a **Sponsor** button.
 
 You can install anything, from anyone: verified developers, community packagers,
 and people nobody has heard of. Flatsonar never hides an app for being unverified.
@@ -96,7 +96,7 @@ publishes), but the client lists them before installing.
 
 The crawler also guards the id itself. One app id, one publisher: Flathub always
 keeps its row, and a repo claiming a Flathub app's id may only enrich it when it
-*is* the repo Flathub builds from (so nobody can plant a funding link on someone
+*is* the repo Flathub builds from (so nobody can plant a sponsor button on someone
 else's app). Between two off-Flathub publishers the first one seen keeps the id
 unless the newcomer is strictly more trusted, i.e. the real owner turning up after
 a copy. Losers are logged and counted as skipped.
@@ -167,7 +167,7 @@ stylesheet, no build step):
 |------|------|
 | `/` | Landing page: what Flatsonar is, catalogue numbers, trust levels, newest and off-Flathub finds |
 | `/apps` | The catalogue: search, category sidebar, risk / trust / where filters, sort, pagination |
-| `/apps/<id>` | One app: funding links, screenshots, description, every permission with its level, publisher findings, install commands per source, details |
+| `/apps/<id>` | One app: sponsor buttons, screenshots, description, every permission with its level, publisher findings, install commands per source, details |
 | `/about` | The hunt, the trust model, the two gates, getting listed, the API |
 | `/sitemap.xml`, `/feed.xml`, `/robots.txt` | For crawlers and feed readers |
 
@@ -217,7 +217,7 @@ catalogue" section and the Atom feed meaningful between runs.
 - **GitHub / GitLab / Codeberg** - repos with the `flatpak` topic (and GitHub code search
   with a token) whose tree contains a `reverse.dns.Name.{json,yml,yaml}` manifest.
   `.metainfo.xml` gives name/summary/license/screenshots, `FUNDING.yml` and AppStream
-  `<url type="donation">` give the funding links, release assets ending in `.flatpak`
+  `<url type="donation">` give the sponsor buttons, release assets ending in `.flatpak`
   become one-click bundle installs, `.flatpakrepo` files become remotes, and anything
   with only a manifest gets built locally with `flatpak-builder`.
 
