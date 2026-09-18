@@ -117,17 +117,39 @@ def get_app(db: Session, app_id: str) -> App | None:
                      .where(App.app_id == app_id))
 
 
-# freedesktop.org's category registry (specifications.freedesktop.org/menu-spec)
-# includes toolkit/platform markers under "Additional Categories" - "application
-# based on GTK+ libraries" and the like - which describe implementation, not
-# content, so they make poor browsing categories. X- prefixed categories are the
-# spec's own vendor-specific extension namespace: arbitrary per app, never a
-# shared taxonomy, not in the registry at all.
-_NOT_A_BROWSE_CATEGORY = {"Qt", "GTK", "GNOME", "KDE", "COSMIC", "LXQt", "XFCE", "DDE", "Motif", "Java", "ConsoleOnly", "Core"}
+# freedesktop.org's full Main + Additional Categories registry (fetched directly
+# from specifications.freedesktop.org/menu-spec/latest/{category,additional-category}
+# -registry.html, not guessed): an allowlist, not a denylist, so a category some app
+# just made up (an app's own invention, a typo, "Tool"/"Developer" - neither is
+# registered under any name) doesn't need to be caught one at a time as it turns up.
+_REGISTERED_CATEGORIES = frozenset({
+    "2DGraphics", "3DGraphics", "Accessibility", "ActionGame", "Adult", "AdventureGame", "Amusement", "ArcadeGame",
+    "Archiving", "Art", "ArtificialIntelligence", "Astronomy", "Audio", "AudioVideo", "AudioVideoEditing", "Biology",
+    "BlocksGame", "BoardGame", "Building", "COSMIC", "Calculator", "Calendar", "CardGame", "CareProvider", "Chart",
+    "Chat", "Chemistry", "Clock", "Compression", "ComputerScience", "ConsoleOnly", "Construction", "ContactManagement",
+    "Core", "DDE", "DataVisualization", "Database", "Debugger", "DesktopSettings", "Development", "Dialup",
+    "Dictionary", "DiscBurning", "Documentation", "Economy", "Education", "Electricity", "Electronics", "Email",
+    "Emulator", "Engineering", "Exercise", "Feed", "FileManager", "FileTools", "FileTransfer", "Filesystem",
+    "Finance", "FlowChart", "GNOME", "GTK", "GUIDesigner", "Game", "GameTool", "Geography", "Geology", "Geoscience",
+    "Graphics", "HamRadio", "HardwareSettings", "HealthFitness", "History", "Humanities", "IDE", "IRCClient",
+    "ImageProcessing", "InstantMessaging", "Java", "KDE", "KidsGame", "LXQt", "Languages", "LauncherStore",
+    "Literature", "LogicGame", "Maps", "Math", "MedicalSoftware", "Medication", "Midi", "Mindfulness", "Mixer",
+    "Monitor", "Motif", "Music", "Network", "News", "NumericalAnalysis", "Nutrition", "OCR", "Office", "P2P", "PDA",
+    "PackageManager", "ParallelComputing", "Photography", "Physics", "Player", "Presentation", "Printing",
+    "Profiling", "ProjectManagement", "Publishing", "Qt", "RasterGraphics", "Recorder", "RemoteAccess",
+    "RevisionControl", "Robotics", "RolePlaying", "Scanning", "Science", "Security", "Sequencer", "Settings",
+    "Shooter", "Simulation", "Sleep", "Spirituality", "Sports", "SportsGame", "Spreadsheet", "StrategyGame",
+    "System", "TV", "Telephony", "TelephonyTools", "TerminalEmulator", "TextEditor", "TextTools", "Translation",
+    "Tuner", "Utility", "VectorGraphics", "Video", "VideoConference", "Viewer", "WebBrowser", "WebDevelopment",
+    "WordProcessor", "XFCE",
+})
+# Registered, but describes implementation ("application based on GTK+ libraries"),
+# not content - a poor browsing category regardless of being in the registry.
+_TOOLKIT_CATEGORIES = frozenset({"COSMIC", "DDE", "GNOME", "GTK", "Java", "KDE", "LXQt", "Motif", "Qt", "XFCE", "ConsoleOnly", "Core"})
 
 
 def is_browsable_category(name: str) -> bool:
-    return name not in _NOT_A_BROWSE_CATEGORY and not name.startswith("X-")
+    return name in _REGISTERED_CATEGORIES and name not in _TOOLKIT_CATEGORIES
 
 
 def browsable_categories(categories: list[str] | None) -> list[str]:
