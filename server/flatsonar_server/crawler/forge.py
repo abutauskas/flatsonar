@@ -215,10 +215,18 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
 
         icon_path = find_icon(repo.tree, base_id)
         name = (meta.name if meta else None) or repo.full_name.rsplit("/", 1)[-1]
+        summary = (meta.summary if meta else None) or (repo.description or "")[:512]
+        if name == "Example" and summary == "A summary":
+            # A handful of repos (flatpak-builder-lint's test fixtures, and anything
+            # shaped like it) ship many manifests with this exact literal placeholder
+            # metadata to exercise a linter/parser - not real apps, just fixtures that
+            # happen to look like real manifests to the file-name heuristic above.
+            log.debug("%s:%s has placeholder Example/A summary metadata, skipping", repo.full_name, path)
+            continue
         cand = Candidate(
             app_id=base_id,
             name=name,
-            summary=(meta.summary if meta else None) or (repo.description or "")[:512],
+            summary=summary,
             description=(meta.description if meta else None) or repo.description or "",
             icon_url=forge.raw_url(repo, icon_path) if icon_path else repo.avatar_url,
             screenshots=meta.screenshots if meta else [],
