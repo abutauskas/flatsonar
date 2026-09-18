@@ -82,13 +82,37 @@ document.addEventListener('keydown', function (e) {
 
   function matches(card) {
     var needle = q.value.trim().toLowerCase();
-    if (needle && (card.dataset.search || '').indexOf(needle) === -1) return false;
+    if (needle) {
+      // Each word must appear somewhere in the card's text, so word order doesn't
+      // matter: "calculator gnome" finds "GNOME Calculator" same as the reverse.
+      var hay = card.dataset.search || '';
+      var words = needle.split(/\s+/);
+      for (var i = 0; i < words.length; i++) {
+        if (hay.indexOf(words[i]) === -1) return false;
+      }
+    }
     var cat = currentCategory();
     if (cat && (card.dataset.category || '').split(',').indexOf(cat) === -1) return false;
     if (whereSel.value && card.dataset.where !== whereSel.value) return false;
     if (riskSel.value && card.dataset.risk !== riskSel.value) return false;
     if (trustSel.value && trustSel.value.split(',').indexOf(card.dataset.trust) === -1) return false;
     return true;
+  }
+
+  // A score that rewards each search word appearing in the name (most) or the id
+  // (some), plus a bonus for an exact full-phrase name match - summed across every
+  // word, so "gnome calculator" and "calculator gnome" score GNOME Calculator the
+  // same regardless of order or which field actually carried a given word. Mirrors
+  // catalogue._relevance() server-side so both search paths rank the same way.
+  function relevance(card, words, needle) {
+    var name = (card.dataset.name || '').toLowerCase();
+    var id = (card.dataset.id || '').toLowerCase();
+    var score = name === needle ? 1000 : 0;
+    for (var i = 0; i < words.length; i++) {
+      if (name.indexOf(words[i]) !== -1) score += 10;
+      if (id.indexOf(words[i]) !== -1) score += 3;
+    }
+    return score;
   }
 
   var SORTERS = {
@@ -99,7 +123,18 @@ document.addEventListener('keydown', function (e) {
   };
 
   function render() {
-    var visible = cards.filter(matches).sort(SORTERS[sortSel.value] || SORTERS.name);
+    var needle = q.value.trim().toLowerCase();
+    var words = needle ? needle.split(/\s+/) : [];
+    var sorter = SORTERS[sortSel.value] || SORTERS.name;
+    // "name" is the default sort, not something anyone picks *for a search* - once
+    // there's a query, relevance beats alphabetical unless stars/date was chosen.
+    if (needle && sortSel.value === 'name') {
+      sorter = function (a, b) {
+        var r = relevance(b, words, needle) - relevance(a, words, needle);
+        return r !== 0 ? r : (+b.dataset.stars || 0) - (+a.dataset.stars || 0);
+      };
+    }
+    var visible = cards.filter(matches).sort(sorter);
     var toShow = visible.slice(0, shown);
     var wanted = {};
     toShow.forEach(function (c) { wanted[c.dataset.id] = true; grid.appendChild(c); });

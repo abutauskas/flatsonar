@@ -192,7 +192,7 @@ def apps(
     except catalogue.BadFilter:
         trust = None
         stmt = catalogue.apps_query(q=q, category=category, risk=risk or None, on_flathub=on_flathub)
-    rows, total = catalogue.page_apps(db, stmt, sort, page, PER_PAGE)
+    rows, total = catalogue.page_apps(db, stmt, sort, page, PER_PAGE, q=q)
     pages = max(1, -(-total // PER_PAGE))
     return render(request, "apps.html", apps=rows, total=total, page=page, pages=pages, q=q or "",
                   category=category or "", risk=risk or "", trust=trust or "", where=where or "", sort=sort,

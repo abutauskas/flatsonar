@@ -38,7 +38,7 @@ def list_apps(
                                     ids=ids.split(",") if ids is not None else None)
     except catalogue.BadFilter as exc:
         raise HTTPException(422, str(exc))
-    rows, total = catalogue.page_apps(db, stmt, sort, page, per_page)
+    rows, total = catalogue.page_apps(db, stmt, sort, page, per_page, q=q)
     return Page(items=[_summary(a) for a in rows], total=total, page=page, per_page=per_page)
 
 

@@ -7,7 +7,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import String, func, or_, select
+from sqlalchemy import String, case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql import Select
 
@@ -26,6 +26,24 @@ TRUSTS = tuple(level.label for level in TrustLevel)
 
 class BadFilter(ValueError):
     """A filter value the catalogue does not know (an unknown trust level)."""
+
+
+def _relevance(q: str):
+    """A score that rewards each search word appearing in the name (most) or the app
+    id (some), plus a bonus for an exact full-phrase name match - summed across every
+    word, so "gnome calculator" and "calculator gnome" both score org.gnome.Calculator
+    the same regardless of word order or which field actually carried a given word.
+    Order *descending*: higher is a better match, ties broken by stars in
+    ``page_apps``. A word that only matched summary/description/categories (per the
+    ``apps_query`` filter) contributes nothing here, so it sinks below name/id hits
+    without being excluded."""
+    needle = q.strip()
+    terms = needle.split()[:8]
+    score = case((func.lower(App.name) == needle.lower(), 1000), else_=0)
+    for t in terms:
+        like = f"%{t}%"
+        score += case((App.name.ilike(like), 10), else_=0) + case((App.app_id.ilike(like), 3), else_=0)
+    return score
 
 
 def parse_trust(trust: str | None) -> list[str]:
@@ -54,9 +72,16 @@ def apps_query(
     if oss_only:
         stmt = stmt.where(App.is_oss.is_(True))
     if q:
-        like = f"%{q.strip()}%"
-        stmt = stmt.where(or_(App.name.ilike(like), App.summary.ilike(like), App.app_id.ilike(like),
-                              App.developer_name.ilike(like)))
+        # Each word must match somewhere (AND across words, OR across fields per word), so
+        # word order and which field it landed in don't matter: "calculator gnome" finds
+        # "GNOME Calculator" as readily as "gnome calculator" does.
+        for term in q.strip().split()[:8]:
+            like = f"%{term}%"
+            stmt = stmt.where(or_(
+                App.name.ilike(like), App.summary.ilike(like), App.description.ilike(like),
+                App.app_id.ilike(like), App.developer_name.ilike(like),
+                func.cast(App.categories, String).ilike(like),
+            ))
     if category:
         # categories is JSON; portable LIKE on its serialised form is good enough for now.
         stmt = stmt.where(func.cast(App.categories, String).ilike(f'%"{category}"%'))
@@ -76,9 +101,14 @@ def apps_query(
     return stmt
 
 
-def page_apps(db: Session, stmt: Select, sort: str = "name", page: int = 1, per_page: int = 48) -> tuple[list[App], int]:
+def page_apps(
+    db: Session, stmt: Select, sort: str = "name", page: int = 1, per_page: int = 48, q: str | None = None
+) -> tuple[list[App], int]:
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-    rows = db.scalars(stmt.order_by(SORTS[sort]).offset((page - 1) * per_page).limit(per_page)).all()
+    # "name" is the default sort, not something anyone picks *for a search* - once there's
+    # a query, relevance beats alphabetical unless the user explicitly asked for stars/date.
+    order = (_relevance(q).desc(), App.stars.desc()) if q and sort == "name" else (SORTS[sort],)
+    rows = db.scalars(stmt.order_by(*order).offset((page - 1) * per_page).limit(per_page)).all()
     return list(rows), total
 
 
