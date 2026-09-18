@@ -93,8 +93,8 @@ img { max-width: 100%; }
 .btn.ghost { background: transparent; color: inherit; border-color: color-mix(in srgb, currentColor 30%, transparent); }
 .btn.ghost:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 .btn.small { padding: 8px 14px; font-size: .85rem; }
-.btn.sponsor { background: color-mix(in srgb, var(--pink) 14%, transparent); color: var(--pink); border-color: color-mix(in srgb, var(--pink) 30%, transparent); }
-.btn.sponsor svg { width: 15px; height: 15px; }
+.btn.support { background: color-mix(in srgb, var(--pink) 14%, transparent); color: var(--pink); border-color: color-mix(in srgb, var(--pink) 30%, transparent); }
+.btn.support svg { width: 15px; height: 15px; }
 input.search, .hero-search input, select {
   font: 500 .95rem var(--font); color: var(--text);
   background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
@@ -248,10 +248,13 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .app-head .by { color: var(--muted); margin: 0 0 .5em; }
 .app-head .summary { font-size: 1.15rem; margin-bottom: .8em; }
 .head-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
-.sponsor-box { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; margin: 32px 0 8px; padding: 22px 26px; border-radius: var(--radius); background: color-mix(in srgb, var(--pink) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--pink) 25%, var(--border)); }
-.sponsor-box h2 { font-size: 1.25rem; margin-bottom: .2em; }
-.sponsor-box p { margin: 0; color: var(--muted); }
-.sponsor-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+/* Named "support", not "sponsor": EasyList and AdGuard's base filter both ship a
+   bare ##.sponsor-box rule (any site, any element with that class), so an ad
+   blocker was hiding this box entirely. */
+.support-box { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; margin: 32px 0 8px; padding: 22px 26px; border-radius: var(--radius); background: color-mix(in srgb, var(--pink) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--pink) 25%, var(--border)); }
+.support-box h2 { font-size: 1.25rem; margin-bottom: .2em; }
+.support-box p { margin: 0; color: var(--muted); }
+.support-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .app-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 40px; margin-top: 32px; align-items: start; }
 .app-body .main, .app-body .aside { min-width: 0; }
 .app-body .main > section { margin-bottom: 40px; }
@@ -370,8 +373,8 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
   .app-head { grid-template-columns: 72px 1fr; }
   .app-head .icon { width: 72px; height: 72px; border-radius: 18px; }
   .head-actions { grid-column: 1 / -1; flex-direction: row; }
-  .sponsor-box { grid-template-columns: 1fr; }
-  .sponsor-row { justify-content: flex-start; }
+  .support-box { grid-template-columns: 1fr; }
+  .support-row { justify-content: flex-start; }
   .shots img { height: 200px; }
   .footlinks { grid-template-columns: 1fr; }
 }
