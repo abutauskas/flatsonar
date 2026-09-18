@@ -7,7 +7,7 @@ import logging
 from collections.abc import AsyncIterator
 from urllib.parse import quote
 
-from .base import Candidate, CrawlContext
+from .base import Candidate, CrawlContext, fan_out
 from .forge import RepoInfo, candidates_from_repo, parse_timestamp
 
 log = logging.getLogger("flatsonar.crawler.gitlab")
@@ -130,11 +130,17 @@ class GitLabSource:
     async def discover(self, ctx: CrawlContext, limit: int | None = None) -> AsyncIterator[Candidate]:
         n = 0
         for forge in self.forges:
-            async for repo in forge.list_repos(ctx, limit):
+            repos = [r async for r in forge.list_repos(ctx, limit)]
+
+            async def worker(repo: RepoInfo, forge=forge) -> list[Candidate]:
                 try:
-                    for cand in await candidates_from_repo(ctx, forge, repo):
-                        yield cand
-                        n += 1
+                    return await candidates_from_repo(ctx, forge, repo)
                 except Exception as exc:
                     log.warning("gitlab %s: %s", repo.full_name, exc)
+                    return []
+
+            async for cands in fan_out(repos, worker, ctx.concurrency):
+                for cand in cands:
+                    yield cand
+                    n += 1
         log.info("gitlab: %d candidates", n)

@@ -9,11 +9,11 @@ import hashlib
 import json
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 from urllib.parse import urlsplit
 
 import httpx
@@ -99,6 +99,7 @@ class CrawlContext:
             http2=False,
         )
         self.cache = HttpCache(settings.crawl_cache_dir)
+        self.concurrency = concurrency
         self.limiter = _HostLimiter(min_interval, concurrency)
         self.settings = settings
 
@@ -162,6 +163,29 @@ class CrawlContext:
             return r.json()
         except json.JSONDecodeError:
             return None
+
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+
+async def fan_out(items: list[T], worker: Callable[[T], Awaitable[R]], concurrency: int) -> AsyncIterator[R]:
+    """Runs ``worker`` over ``items`` with up to ``concurrency`` in flight, yielding
+    each result as it finishes rather than in ``items`` order. Processing one item at
+    a time behind a single ``await`` chain leaves :class:`CrawlContext`'s concurrency
+    cap and per-host pacing unused; this is what actually fills them. ``worker``
+    should catch its own errors and return a falsy result rather than raise."""
+    queue: asyncio.Queue[R] = asyncio.Queue()
+    sem = asyncio.Semaphore(concurrency)
+
+    async def run(item: T) -> None:
+        async with sem:
+            await queue.put(await worker(item))
+
+    tasks = [asyncio.create_task(run(item)) for item in items]
+    for _ in items:
+        yield await queue.get()
+    await asyncio.gather(*tasks)
 
 
 # --- candidates ----------------------------------------------------------------

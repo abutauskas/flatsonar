@@ -22,7 +22,7 @@ from flatsonar_core.manifest import ManifestError
 
 from ..models import SourceKind
 from . import funding
-from .base import Candidate, CrawlContext, SourceSpec
+from .base import Candidate, CrawlContext, SourceSpec, fan_out
 from .credit import developer_from, normalise_repo_url
 from .trust import assess
 
@@ -154,23 +154,16 @@ class FlathubSource:
             ids = ids[:limit]
         log.info("flathub: %d app ids", len(ids))
 
-        queue: asyncio.Queue[Candidate | None] = asyncio.Queue()
-        sem = asyncio.Semaphore(self.concurrency)
+        async def worker(app_id: str) -> Candidate | None:
+            try:
+                cand = await self.one(ctx, app_id)
+                if cand is not None:
+                    await assess(ctx, cand)
+                return cand
+            except Exception as exc:  # keep the crawl going
+                log.warning("flathub %s: %s", app_id, exc)
+                return None
 
-        async def worker(app_id: str) -> None:
-            async with sem:
-                try:
-                    cand = await self.one(ctx, app_id)
-                    if cand is not None:
-                        await assess(ctx, cand)
-                except Exception as exc:  # keep the crawl going
-                    log.warning("flathub %s: %s", app_id, exc)
-                    cand = None
-                await queue.put(cand)
-
-        tasks = [asyncio.create_task(worker(i)) for i in ids]
-        for _ in ids:
-            cand = await queue.get()
+        async for cand in fan_out(ids, worker, self.concurrency):
             if cand is not None:
                 yield cand
-        await asyncio.gather(*tasks)

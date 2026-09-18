@@ -9,7 +9,7 @@ import logging
 from collections.abc import AsyncIterator
 from urllib.parse import quote
 
-from .base import Candidate, CrawlContext
+from .base import Candidate, CrawlContext, fan_out
 from .forge import RepoInfo, candidates_from_repo, parse_timestamp
 
 log = logging.getLogger("flatsonar.crawler.github")
@@ -154,12 +154,18 @@ class GitHubSource:
         self.forge = GitHubForge(token)
 
     async def discover(self, ctx: CrawlContext, limit: int | None = None) -> AsyncIterator[Candidate]:
-        n = 0
-        async for repo in self.forge.list_repos(ctx, limit):
+        repos = [r async for r in self.forge.list_repos(ctx, limit)]
+
+        async def worker(repo: RepoInfo) -> list[Candidate]:
             try:
-                for cand in await candidates_from_repo(ctx, self.forge, repo):
-                    yield cand
-                    n += 1
+                return await candidates_from_repo(ctx, self.forge, repo)
             except Exception as exc:
                 log.warning("github %s: %s", repo.full_name, exc)
+                return []
+
+        n = 0
+        async for cands in fan_out(repos, worker, ctx.concurrency):
+            for cand in cands:
+                yield cand
+                n += 1
         log.info("github: %d candidates", n)
