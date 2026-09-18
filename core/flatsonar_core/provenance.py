@@ -151,6 +151,7 @@ _VENDOR_NAMESPACES: dict[str, tuple[tuple[str, str | None], ...]] = {
     "org.apache": (("apache.org", None), ("github.com", "apache")),
     "org.eclipse": (("eclipse.org", None), ("github.com", "eclipse")),
     "org.python": (("python.org", None), ("github.com", "python")),
+    "org.fdroid": (("gitlab.com", "fdroid"), ("github.com", "f-droid")),
     "org.debian": (("debian.org", None),),
     "org.fedoraproject": (("fedoraproject.org", None), ("pagure.io", None)),
     "com.ubuntu": (("ubuntu.com", None), ("launchpad.net", None)),
