@@ -77,6 +77,14 @@ jobs:
           python -m flatsonar_server.crawler.run --source all --concurrency 12 -v \
             ${LIMIT:+--limit "$LIMIT"}
 
+      - name: Seed easter eggs
+        # Flatsonar listing itself. Not a crawl source (nothing to discover, the
+        # entry is declared), so this always runs, independent of the "Crawl" step
+        # above - a push-only rebuild still re-syncs its stars/pushed_at.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -m flatsonar_server.seed_easter_eggs
+
       - name: Build the static site
         run: python -m flatsonar_server.web.build --out public --site-url "$SITE_URL"
 
