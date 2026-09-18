@@ -56,11 +56,17 @@
   <div class="app-body">
     <div class="main">
       {% if app.screenshots %}
-      <section class="shots" aria-label="Screenshots">
+      <section class="shots" aria-label="Screenshots" data-lightbox>
         {% for url in app.screenshots[:8] %}
         <a href="{{ url }}" rel="noopener"><img src="{{ url }}" alt="Screenshot {{ loop.index }} of {{ app.name }}" loading="lazy" decoding="async"></a>
         {% endfor %}
       </section>
+      <div class="lightbox" data-lightbox-overlay hidden>
+        <button class="lightbox-close" type="button" aria-label="Close">&times;</button>
+        <button class="lightbox-nav prev" type="button" aria-label="Previous screenshot">&#10094;</button>
+        <img class="lightbox-img" alt="">
+        <button class="lightbox-nav next" type="button" aria-label="Next screenshot">&#10095;</button>
+      </div>
       {% endif %}
 
       {% if app.description %}

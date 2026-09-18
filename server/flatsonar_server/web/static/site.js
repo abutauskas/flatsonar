@@ -29,6 +29,62 @@ document.addEventListener('keydown', function (e) {
   if (box) { e.preventDefault(); box.focus(); box.select(); }
 });
 
+// Screenshot lightbox: click a thumbnail to view it enlarged in place instead of
+// opening the raw image in a new tab.
+(function () {
+  var gallery = document.querySelector('[data-lightbox]');
+  var overlay = document.querySelector('[data-lightbox-overlay]');
+  if (!gallery || !overlay) return;
+  var links = Array.prototype.slice.call(gallery.querySelectorAll('a'));
+  var img = overlay.querySelector('.lightbox-img');
+  var closeBtn = overlay.querySelector('.lightbox-close');
+  var prevBtn = overlay.querySelector('.lightbox-nav.prev');
+  var nextBtn = overlay.querySelector('.lightbox-nav.next');
+  if (!links.length || !img) return;
+  var index = 0;
+
+  function show(i) {
+    index = (i + links.length) % links.length;
+    img.src = links[index].getAttribute('href');
+    var thumb = links[index].querySelector('img');
+    img.alt = thumb ? thumb.alt : '';
+    var multi = links.length > 1;
+    prevBtn.hidden = nextBtn.hidden = !multi;
+  }
+
+  function open(i) {
+    show(i);
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    closeBtn.focus();
+  }
+
+  function close() {
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  links.forEach(function (a, i) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      open(i);
+    });
+  });
+
+  closeBtn.addEventListener('click', close);
+  prevBtn.addEventListener('click', function () { show(index - 1); });
+  nextBtn.addEventListener('click', function () { show(index + 1); });
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) close();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (overlay.hidden) return;
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowLeft') show(index - 1);
+    else if (e.key === 'ArrowRight') show(index + 1);
+  });
+})();
+
 // --- static-catalogue: client-side search/filter/sort/pagination -------------------------
 //
 // GitHub Pages has no server to run the dynamic /apps query against, so the static build
