@@ -136,7 +136,7 @@ class FlathubSource:
             developer_name=developer_from(upstream, meta.get("developer_name")),
             upstream_url=upstream.url if upstream else urls.get("vcs_browser"),
             homepage=urls.get("homepage"),
-            sponsor_links=funding.donation_link(urls.get("donation")),
+            funding_links=funding.donation_link(urls.get("donation")),
             latest_version=(releases[0].get("version") if releases else None),
             on_flathub=True,
             flathub_verified=bool(md.get("flathub::verification::verified")),

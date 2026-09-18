@@ -29,7 +29,7 @@
 <section class="wrap stats" aria-label="Catalogue numbers">
   <div class="stat"><b>{{ '{:,}'.format(stats.apps) }}</b><span>open-source apps</span></div>
   <div class="stat"><b>{{ '{:,}'.format(stats.off_flathub) }}</b><span>found outside Flathub</span></div>
-  <div class="stat"><b>{{ '{:,}'.format(stats.with_sponsor) }}</b><span>with a sponsor button</span></div>
+  <div class="stat"><b>{{ '{:,}'.format(stats.with_funding) }}</b><span>with a funding link</span></div>
   <div class="stat"><b>{{ '{:,}'.format(stats.by_trust.get('verified', 0)) }}</b><span>verified creators</span></div>
 </section>
 
@@ -45,7 +45,7 @@
     <article class="card">
       <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-7.5-10A4 4 0 0 1 12 8a4 4 0 0 1 7.5 3c0 5.4-7.5 10-7.5 10z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div>
       <h3>Credit where it is due</h3>
-      <p>Every listing names the creator and links the source. <code>FUNDING.yml</code> and AppStream donation links become a Sponsor button. {{ site.name }} is the shop window; the people behind the apps get the money.</p>
+      <p>Every listing names the creator and links the source. <code>FUNDING.yml</code> and AppStream donation links become a funding link. {{ site.name }} is the shop window; the people behind the apps get the money.</p>
     </article>
     <article class="card">
       <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -79,7 +79,7 @@
 {% if loved %}
 <section class="block wrap">
   <div class="rowhead">
-    <div><h2>Creators you can support</h2><p class="sub">Most-starred apps whose authors take sponsorship.</p></div>
+    <div><h2>Creators you can support</h2><p class="sub">Most-starred apps whose creators accept funding.</p></div>
     <a class="btn ghost small" href="/apps?sort=stars">See all</a>
   </div>
   {{ app_grid(loved) }}

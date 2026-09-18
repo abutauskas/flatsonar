@@ -226,7 +226,7 @@ class Candidate:
     developer_name: str | None = None
     upstream_url: str | None = None
     homepage: str | None = None
-    sponsor_links: list[dict[str, str]] | None = None
+    funding_links: list[dict[str, str]] | None = None
     latest_version: str | None = None
     stars: int | None = None
     forks: int | None = None
@@ -293,7 +293,7 @@ def _guard_collision(db: Session, app: App, cand: Candidate) -> None:
     """Two publishers, one app id. Decide who keeps the row.
 
     * Flathub always keeps it; a forge candidate may only enrich, and only when it is
-      the same repository Flathub builds from (else an impostor could plant sponsor links).
+      the same repository Flathub builds from (else an impostor could plant funding links).
     * Otherwise the candidate takes over only if it is strictly more trusted (e.g. the
       real ``io.github.alice`` repo turning up after a copy). Equal trust: first seen wins,
       the incumbent gets a note that someone else publishes the same id.
@@ -308,7 +308,7 @@ def _guard_collision(db: Session, app: App, cand: Candidate) -> None:
                  app.upstream_url, incumbent.label)
         for row in db.scalars(select(InstallSource).where(InstallSource.app_id == app.app_id)):
             db.delete(row)
-        app.sponsor_links = []
+        app.funding_links = []
         app.trust_findings = []
         db.flush()
         return
@@ -335,11 +335,11 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App, bool]:
             app.stars = max(app.stars or 0, cand.stars)
         if cand.forks is not None:
             app.forks = max(app.forks or 0, cand.forks)
-        if cand.sponsor_links:
-            merged = {(l["platform"], l["url"]): l for l in (app.sponsor_links or [])}
-            for l in cand.sponsor_links:
+        if cand.funding_links:
+            merged = {(l["platform"], l["url"]): l for l in (app.funding_links or [])}
+            for l in cand.funding_links:
                 merged.setdefault((l["platform"], l["url"]), l)
-            app.sponsor_links = list(merged.values())
+            app.funding_links = list(merged.values())
         for attr in ("upstream_url", "homepage", "developer_name", "icon_url", "repo_created_at", "repo_pushed_at"):
             if not getattr(app, attr) and getattr(cand, attr):
                 setattr(app, attr, getattr(cand, attr))
@@ -368,11 +368,11 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App, bool]:
         app.trust = cand.trust.label
         app.trust_findings = [*kept, *(_finding_dict(f) for f in findings)]
 
-    if cand.sponsor_links:
-        merged = {(l["platform"], l["url"]): l for l in (app.sponsor_links or [])}
-        for l in cand.sponsor_links:
+    if cand.funding_links:
+        merged = {(l["platform"], l["url"]): l for l in (app.funding_links or [])}
+        for l in cand.funding_links:
             merged.setdefault((l["platform"], l["url"]), l)
-        app.sponsor_links = list(merged.values())
+        app.funding_links = list(merged.values())
 
     if cand.is_oss is not None:
         app.is_oss = cand.is_oss

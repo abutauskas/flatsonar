@@ -55,7 +55,7 @@ TRUST_TIP = {
     "suspicious": "Something concrete is wrong: the id claims a namespace this repository does not own, or the "
                   "build does things a build should not. Flatsonar warns twice.",
 }
-SPONSOR_LABEL = {
+FUNDING_LABEL = {
     "github": "GitHub Sponsors", "patreon": "Patreon", "ko_fi": "Ko-fi", "liberapay": "Liberapay",
     "open_collective": "Open Collective", "buy_me_a_coffee": "Buy Me a Coffee", "custom": "Donate",
 }
@@ -86,8 +86,8 @@ def paragraphs(text: str | None) -> Markup:
     return Markup("".join(out))
 
 
-def sponsor_label(platform: str) -> str:
-    return SPONSOR_LABEL.get(platform, platform.replace("_", " ").title())
+def funding_label(platform: str) -> str:
+    return FUNDING_LABEL.get(platform, platform.replace("_", " ").title())
 
 
 def install_options(app: App) -> list[dict[str, Any]]:
@@ -145,7 +145,7 @@ def _nicedate(d: datetime | None, fmt: str = "%b %d, %Y") -> str:
 
 templates = Jinja2Templates(directory=str(HERE / "templates"))
 templates.env.filters["paragraphs"] = paragraphs
-templates.env.filters["sponsor_label"] = sponsor_label
+templates.env.filters["funding_label"] = funding_label
 templates.env.filters["isodate"] = _dt
 templates.env.filters["nicedate"] = _nicedate
 templates.env.globals.update(
@@ -167,7 +167,7 @@ def render(request: Request, name: str, status_code: int = 200, **ctx: Any) -> H
 def home(request: Request, db: Session = Depends(get_session)):
     stats = catalogue.catalogue_stats(db)
     newest, _ = catalogue.page_apps(db, catalogue.apps_query(), "newest", 1, 8)
-    loved, _ = catalogue.page_apps(db, catalogue.apps_query(sponsor_only=True), "stars", 1, 8)
+    loved, _ = catalogue.page_apps(db, catalogue.apps_query(funding_only=True), "stars", 1, 8)
     hunted, _ = catalogue.page_apps(db, catalogue.apps_query(on_flathub=False), "stars", 1, 8)
     return render(request, "index.html", stats=stats, newest=newest, loved=loved, hunted=hunted,
                   categories=catalogue.category_counts(db)[:12])

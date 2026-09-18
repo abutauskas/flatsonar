@@ -165,19 +165,19 @@ def test_impostor_cannot_enrich_flathub_app(session):
 
     impostor = _cand("org.gnome.Calculator", src="https://github.com/mallory/calc.git",
                      upstream_url="https://github.com/mallory/calc",
-                     sponsor_links=[{"platform": "ko_fi", "url": "https://ko-fi.com/mallory"}], stars=9000)
+                     funding_links=[{"platform": "ko_fi", "url": "https://ko-fi.com/mallory"}], stars=9000)
     with pytest.raises(Skipped):
         _write(session, impostor, _repo("https://github.com/mallory/calc"))
     session.rollback()
     app = session.get(App, "org.gnome.Calculator")
-    assert app.sponsor_links == [] and app.stars == 0 and app.trust == "reviewed"
+    assert app.funding_links == [] and app.stars == 0 and app.trust == "reviewed"
 
     # The real upstream repo may still enrich it.
     real = _cand("org.gnome.Calculator", src="https://gitlab.gnome.org/GNOME/gnome-calculator.git",
                  upstream_url="https://gitlab.gnome.org/GNOME/gnome-calculator/",
-                 sponsor_links=[{"platform": "liberapay", "url": "https://liberapay.com/gnome"}], stars=42)
+                 funding_links=[{"platform": "liberapay", "url": "https://liberapay.com/gnome"}], stars=42)
     app, created = _write(session, real, _repo("https://gitlab.gnome.org/GNOME/gnome-calculator"))
-    assert not created and app.stars == 42 and app.sponsor_links[0]["platform"] == "liberapay"
+    assert not created and app.stars == 42 and app.funding_links[0]["platform"] == "liberapay"
 
 
 def test_first_unverified_publisher_keeps_id_and_gets_a_note(session):
@@ -202,7 +202,7 @@ def test_first_unverified_publisher_keeps_id_and_gets_a_note(session):
 def test_verified_owner_takes_over_from_copy(session):
     copy = _cand("io.github.alice.Foo", src="https://github.com/alice/foo.git",
                  upstream_url="https://github.com/mirror/foo",
-                 sponsor_links=[{"platform": "ko_fi", "url": "https://ko-fi.com/mirror"}],
+                 funding_links=[{"platform": "ko_fi", "url": "https://ko-fi.com/mirror"}],
                  sources=[SourceSpec(kind=SourceKind.BUNDLE, bundle_url="https://github.com/mirror/foo/r/x.flatpak")])
     app, _ = _write(session, copy, _repo("https://github.com/mirror/foo"))
     assert app.trust == "unverified"  # third-party packaging of alice's code
@@ -211,7 +211,7 @@ def test_verified_owner_takes_over_from_copy(session):
     app, created = _write(session, real, _repo())
     assert not created and app.trust == "verified"
     assert app.upstream_url == "https://github.com/alice/foo"
-    assert app.sponsor_links == []  # the mirror's links are gone
+    assert app.funding_links == []  # the mirror's links are gone
     kinds = [s.kind for s in session.scalars(
         __import__("sqlalchemy").select(InstallSource).where(InstallSource.app_id == app.app_id))]
     assert kinds == [SourceKind.MANIFEST]

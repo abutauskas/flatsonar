@@ -24,11 +24,11 @@
       <p>Most stores list what people submit. {{ site.name }} goes looking. The crawler walks:</p>
       <ul>
         <li><strong>Flathub</strong>: API v2 for metadata and the <em>deployed</em> permissions, plus the <code>github.com/flathub/&lt;id&gt;</code> manifest for <code>sources</code>, which is where the upstream repository and creator credit come from.</li>
-        <li><strong>GitHub, GitLab, Codeberg</strong>: repositories tagged <code>flatpak</code> (and code search, with a token) whose tree contains a <code>reverse.dns.Name.{json,yml,yaml}</code> manifest. The <code>.metainfo.xml</code> gives the name, summary, license and screenshots; <code>FUNDING.yml</code> and AppStream <code>&lt;url type="donation"&gt;</code> give the Sponsor buttons.</li>
+        <li><strong>GitHub, GitLab, Codeberg</strong>: repositories tagged <code>flatpak</code> (and code search, with a token) whose tree contains a <code>reverse.dns.Name.{json,yml,yaml}</code> manifest. The <code>.metainfo.xml</code> gives the name, summary, license and screenshots; <code>FUNDING.yml</code> and AppStream <code>&lt;url type="donation"&gt;</code> give the funding links.</li>
       </ul>
       <p>Release assets ending in <code>.flatpak</code> become one-click bundle installs, <code>.flatpakrepo</code> files become remotes, and anything that only has a manifest is built locally with <code>flatpak-builder</code>.</p>
       <p>Only OSI/FSF-approved SPDX licenses are listed. Proprietary apps on Flathub are skipped. Verification is never a filter: unverified publishers are indexed like everyone else and labelled honestly.</p>
-      <p class="numbers">Right now: <strong>{{ '{:,}'.format(stats.apps) }}</strong> apps, <strong>{{ '{:,}'.format(stats.off_flathub) }}</strong> of them found outside Flathub, <strong>{{ '{:,}'.format(stats.with_sponsor) }}</strong> with a sponsor link.</p>
+      <p class="numbers">Right now: <strong>{{ '{:,}'.format(stats.apps) }}</strong> apps, <strong>{{ '{:,}'.format(stats.off_flathub) }}</strong> of them found outside Flathub, <strong>{{ '{:,}'.format(stats.with_funding) }}</strong> with a funding link.</p>
     </section>
 
     <section id="trust">
@@ -41,7 +41,7 @@
         <tr><th class="suspicious">Suspicious</th><td>A concrete red flag: the id claims a namespace the repository neither owns nor builds from, or the build does things a build should not, or a bundle is served over plain HTTP.</td></tr>
       </table>
       <p>Yellow notes never downgrade an app on their own (a repository that is three days old with no stars, a name shared with a Flathub app, an id someone else also publishes), but they are listed before installing.</p>
-      <p>One app id, one publisher. Flathub always keeps its row, and a repository claiming a Flathub app's id may only enrich it when it <em>is</em> the repository Flathub builds from, so nobody can plant a sponsor button on someone else's app. Between two off-Flathub publishers the first one seen keeps the id unless the newcomer is strictly more trusted: the real owner turning up after a copy.</p>
+      <p>One app id, one publisher. Flathub always keeps its row, and a repository claiming a Flathub app's id may only enrich it when it <em>is</em> the repository Flathub builds from, so nobody can plant a funding link on someone else's app. Between two off-Flathub publishers the first one seen keeps the id unless the newcomer is strictly more trusted: the real owner turning up after a copy.</p>
       <p>Before anything is built, the manifest itself is audited: <code>extra-data</code> downloaded at install time after any scan, sources over plain <code>http://</code>, archives without a checksum, git sources tracking a branch, prebuilt binaries instead of source, build arguments that open the build sandbox, and build commands such as <code>curl | sh</code>, <code>base64 -d</code>, setuid bits or <code>flatpak-spawn --host</code>.</p>
     </section>
 
@@ -78,7 +78,7 @@ FLATSONAR_API={{ base_url(request) }} python -m flatsonar</code><button class="c
         <li>Keep a <code>flatpak-builder</code> manifest in your repository named after your app id: <code>io.github.you.App.json</code> or <code>.yml</code>.</li>
         <li>Ship an AppStream <code>io.github.you.App.metainfo.xml</code>: name, summary, description, screenshots, license, releases. That is what the listing is made of.</li>
         <li>Add the <code>flatpak</code> topic to the repository.</li>
-        <li>Add a <code>FUNDING.yml</code> or a <code>&lt;url type="donation"&gt;</code> and your listing gets a Sponsor button.</li>
+        <li>Add a <code>FUNDING.yml</code> or a <code>&lt;url type="donation"&gt;</code> and your listing gets a funding link.</li>
         <li>Use an id you own. <code>io.github.you.*</code> is verified automatically when the repository is under <code>you</code>; a custom domain is verified by serving <code>https://your.domain/.well-known/org.flathub.VerifiedApps.txt</code> with the id on a line.</li>
         <li>Pin your sources (<code>sha256</code> for archives, <code>commit</code> for git), keep <code>finish-args</code> tight, and the badges take care of themselves.</li>
       </ul>

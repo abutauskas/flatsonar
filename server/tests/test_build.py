@@ -102,7 +102,7 @@ def test_robots_sitemap_feed_and_apps_json_use_the_full_site_url(tmp_path, sessi
 
     dump = json.loads((out / "apps.json").read_text(encoding="utf-8"))
     assert [a["app_id"] for a in dump] == ["org.gnome.Calculator"]
-    assert dump[0]["has_sponsor"] is False and dump[0]["trust"] == "verified"
+    assert dump[0]["has_funding"] is False and dump[0]["trust"] == "verified"
 
 
 def test_manifest_json_is_written_for_apps_that_have_one(tmp_path, session):

@@ -55,15 +55,15 @@ def test_forge_only_enriches_flathub_apps(session):
     m = parse_manifest_text(MANIFEST.replace("com.example.Hunted", "org.gnome.Calculator"))
     forge = Candidate(
         app_id="org.gnome.Calculator", name="gnome-calculator (repo name)", summary="worse summary",
-        stars=420, sponsor_links=[{"platform": "liberapay", "url": "https://liberapay.com/gnome"}],
+        stars=420, funding_links=[{"platform": "liberapay", "url": "https://liberapay.com/gnome"}],
         manifest=m, is_oss=True, sources=[SourceSpec(kind=SourceKind.MANIFEST, manifest_url="https://x/y.yml")],
     )
     app, created = upsert_candidate(session, forge)
     session.commit()
     assert not created
     assert app.name == "Calculator"  # Flathub data kept
-    assert app.stars == 420  # but stars and sponsors merged in
-    assert app.sponsor_links[0]["platform"] == "liberapay"
+    assert app.stars == 420  # but stars and funding merged in
+    assert app.funding_links[0]["platform"] == "liberapay"
     assert app.risk_level == "green"  # forge manifest (--filesystem=host) did not override deployed perms
     assert [s.kind for s in app.sources] == [SourceKind.FLATHUB]
 

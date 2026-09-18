@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api", tags=["apps"])
 
 def _summary(app: App) -> AppSummary:
     s = AppSummary.model_validate(app)
-    s.has_sponsor = bool(app.sponsor_links)
+    s.has_funding = bool(app.funding_links)
     return s
 
 
@@ -26,7 +26,7 @@ def list_apps(
     source: SourceKind | None = Query(None, description="Only apps installable via this kind"),
     ids: str | None = Query(None, description="Only these app ids, comma-separated (the client's installed list)"),
     oss_only: bool = True,
-    sponsor_only: bool = False,
+    funding_only: bool = False,
     sort: str = Query("name", pattern="^(name|stars|updated|newest)$"),
     page: int = Query(1, ge=1),
     per_page: int = Query(48, ge=1, le=200),
@@ -34,7 +34,7 @@ def list_apps(
 ):
     try:
         stmt = catalogue.apps_query(q=q, category=category, risk=risk, trust=trust, source=source,
-                                    oss_only=oss_only, sponsor_only=sponsor_only,
+                                    oss_only=oss_only, funding_only=funding_only,
                                     ids=ids.split(",") if ids is not None else None)
     except catalogue.BadFilter as exc:
         raise HTTPException(422, str(exc))
@@ -48,7 +48,7 @@ def get_app(app_id: str, db: Session = Depends(get_session)):
     if app is None:
         raise HTTPException(404, f"{app_id} not found")
     d = AppDetail.model_validate(app)
-    d.has_sponsor = bool(app.sponsor_links)
+    d.has_funding = bool(app.funding_links)
     return d
 
 

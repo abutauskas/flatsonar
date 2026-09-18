@@ -40,7 +40,9 @@ class App(Base):
     developer_name: Mapped[str | None] = mapped_column(String(255))
     upstream_url: Mapped[str | None] = mapped_column(String(1024))
     homepage: Mapped[str | None] = mapped_column(String(1024))
-    sponsor_links: Mapped[list[dict]] = mapped_column(JSON, default=list)  # [{platform, url}]
+    # Column stays "sponsor_links" (renaming it needs a migration); the funding_links
+    # attribute is what the rest of the codebase - and the API - actually uses.
+    funding_links: Mapped[list[dict]] = mapped_column("sponsor_links", JSON, default=list)  # [{platform, url}]
 
     # Risk (precomputed from the manifest; the client recomputes at install time)
     risk_level: Mapped[str] = mapped_column(String(8), default="green", index=True)

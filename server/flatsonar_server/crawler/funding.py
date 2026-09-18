@@ -1,5 +1,5 @@
 """Turn a GitHub-style ``FUNDING.yml`` (also used on Codeberg/GitLab by convention)
-and AppStream donation URLs into a flat list of sponsor links."""
+and AppStream donation URLs into a flat list of funding links."""
 
 from __future__ import annotations
 

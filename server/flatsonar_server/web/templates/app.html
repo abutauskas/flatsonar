@@ -36,17 +36,17 @@
     </div>
   </header>
 
-  {% if app.sponsor_links %}
+  {% if app.funding_links %}
   <section class="support-box">
     <div>
       <h2>Support the creators</h2>
       <p>{{ site.name }} is just the shop window. The people below made {{ app.name }}.</p>
     </div>
     <div class="support-row">
-      {% for link in app.sponsor_links %}
+      {% for link in app.funding_links %}
       <a class="btn support" href="{{ link.url }}" rel="noopener" title="{{ link.url }}">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg>
-        {{ link.platform|sponsor_label }}
+        {{ link.platform|funding_label }}
       </a>
       {% endfor %}
     </div>

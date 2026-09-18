@@ -35,13 +35,13 @@ class AppInfo:
     flathub_verified: bool = False
     trust: str = "unverified"  # verified | reviewed | unverified | suspicious
     stars: int = 0
-    has_sponsor: bool = False
+    has_funding: bool = False
     # detail-only
     description: str = ""
     screenshots: list[str] = field(default_factory=list)
     upstream_url: str | None = None
     homepage: str | None = None
-    sponsor_links: list[dict[str, str]] = field(default_factory=list)
+    funding_links: list[dict[str, str]] = field(default_factory=list)
     risk_reasons: list[str] = field(default_factory=list)
     permissions: list[dict[str, str]] = field(default_factory=list)
     trust_findings: list[dict[str, str]] = field(default_factory=list)  # [{check, level, reason}]
@@ -87,7 +87,7 @@ class FlatsonarAPI:
 
     def list_apps(self, q: str | None = None, category: str | None = None, risk: str | None = None,
                   trust: str | None = None, sort: str = "name", page: int = 1, per_page: int = 48,
-                  sponsor_only: bool = False, ids: list[str] | None = None) -> Page:
+                  funding_only: bool = False, ids: list[str] | None = None) -> Page:
         params: dict[str, Any] = {"page": page, "per_page": per_page, "sort": sort}
         if ids is not None:
             params["ids"] = ",".join(ids)
@@ -99,8 +99,8 @@ class FlatsonarAPI:
             params["risk"] = risk
         if trust:
             params["trust"] = trust
-        if sponsor_only:
-            params["sponsor_only"] = "true"
+        if funding_only:
+            params["funding_only"] = "true"
         r = self._client.get("/api/apps", params=params)
         r.raise_for_status()
         d = r.json()

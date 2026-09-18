@@ -37,7 +37,7 @@ CSS = """
 .risk-pill.red { background: alpha(@error_color, 0.18); color: @error_color; }
 .risk-pill.accent { background: alpha(@accent_bg_color, 0.18); color: @accent_color; }
 .hero-icon { border-radius: 24px; }
-.sponsor { background: alpha(@accent_bg_color, 0.15); color: @accent_color; }
+.support { background: alpha(@accent_bg_color, 0.15); color: @accent_color; }
 .status-bar { padding: 6px 12px; }
 """
 
@@ -96,9 +96,9 @@ class AppCard(Gtk.Button):
 
         foot = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER)
         foot.append(risk_pill(app.risk_level))
-        if app.has_sponsor:
+        if app.has_funding:
             heart = Gtk.Image.new_from_icon_name("emblem-favorite-symbolic")
-            heart.set_tooltip_text("Has a sponsor link")
+            heart.set_tooltip_text("Has a way to support the creator")
             heart.add_css_class("accent")
             foot.append(heart)
         if app.trust != "reviewed":  # the common Flathub case stays quiet; everything else gets a mark
@@ -130,7 +130,7 @@ def trust_row(finding: dict[str, str]) -> Adw.ActionRow:
     return finding_row(finding["reason"], finding["check"], finding["level"])
 
 
-def sponsor_button(link: dict[str, str]) -> Gtk.Button:
+def funding_button(link: dict[str, str]) -> Gtk.Button:
     label = {
         "github": "GitHub Sponsors", "patreon": "Patreon", "ko_fi": "Ko-fi", "liberapay": "Liberapay",
         "open_collective": "Open Collective", "buy_me_a_coffee": "Buy Me a Coffee", "custom": "Donate",
@@ -138,7 +138,7 @@ def sponsor_button(link: dict[str, str]) -> Gtk.Button:
     btn = Gtk.Button()
     content = Adw.ButtonContent(icon_name="emblem-favorite-symbolic", label=label)
     btn.set_child(content)
-    btn.add_css_class("sponsor")
+    btn.add_css_class("support")
     btn.add_css_class("pill")
     btn.set_tooltip_text(link["url"])
     btn.connect("clicked", lambda _b: Gtk.UriLauncher(uri=link["url"]).launch(None, None, None))

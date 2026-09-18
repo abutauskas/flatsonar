@@ -10,7 +10,7 @@ from test_server import _flathub_candidate
 
 
 def _seed(session):
-    upsert_candidate(session, _flathub_candidate(sponsor_links=[{"platform": "liberapay", "url": "https://liberapay.com/gnome"}],
+    upsert_candidate(session, _flathub_candidate(funding_links=[{"platform": "liberapay", "url": "https://liberapay.com/gnome"}],
                                                   screenshots=["https://x/shot.png"], trust=TrustLevel.VERIFIED,
                                                   description="First paragraph.\n\n- one\n- two\n\nLast <b>bold</b>."))
     upsert_candidate(session, _flathub_candidate("com.spotify.Client", name="Spotify",
@@ -50,7 +50,7 @@ def test_catalogue_filters_and_pagination(client, session):
     assert client.get("/apps?page=0").status_code == 422
 
 
-def test_app_page_shows_install_options_permissions_and_sponsor(client, session):
+def test_app_page_shows_install_options_permissions_and_funding(client, session):
     _seed(session)
     html = client.get("/apps/org.gnome.Calculator").text
     assert "flatpak install flathub org.gnome.Calculator" in html

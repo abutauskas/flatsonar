@@ -1,4 +1,4 @@
-"""App details: who made it, how to sponsor them, what it can touch, and the Install button."""
+"""App details: who made it, how to fund them, what it can touch, and the Install button."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from gi.repository import Adw, Gtk
 from ..api import AppInfo
 from ..icons import load_into
 from ..install.flatpak_cli import InstalledApp
-from ..widgets import TRUST_TIP, permission_row, risk_pill, sponsor_button, trust_pill, trust_row
+from ..widgets import TRUST_TIP, funding_button, permission_row, risk_pill, trust_pill, trust_row
 
 SOURCE_TEXT = {
     "flathub": "Installs from Flathub",
@@ -39,8 +39,8 @@ class AppPage(Adw.NavigationPage):
         self.set_child(toolbar)
 
         body.append(self._hero(installed, update))
-        if app.sponsor_links:
-            body.append(self._sponsor_group())
+        if app.funding_links:
+            body.append(self._funding_group())
         body.append(self._credit_group())
         body.append(self._publisher_group())
         if app.description:
@@ -107,13 +107,13 @@ class AppPage(Adw.NavigationPage):
         self.set_installed(installed, update)
         return row
 
-    def _sponsor_group(self) -> Gtk.Widget:
+    def _funding_group(self) -> Gtk.Widget:
         group = Adw.PreferencesGroup(title="Support the creators",
                                      description="Flatsonar is just the shop window. The people below made this.")
         flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, column_spacing=8, row_spacing=8,
                            max_children_per_line=4, homogeneous=False)
-        for link in self.app.sponsor_links:
-            flow.insert(sponsor_button(link), -1)
+        for link in self.app.funding_links:
+            flow.insert(funding_button(link), -1)
         group.add(flow)
         return group
 

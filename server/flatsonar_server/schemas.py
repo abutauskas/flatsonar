@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from .models import SourceKind
 
 
-class SponsorLink(BaseModel):
+class FundingLink(BaseModel):
     platform: str
     url: str
 
@@ -58,7 +58,7 @@ class AppSummary(BaseModel):
     trust: str  # verified | reviewed | unverified | suspicious
     stars: int
     latest_version: str | None = None
-    has_sponsor: bool = False
+    has_funding: bool = False
 
 
 class AppDetail(AppSummary):
@@ -66,7 +66,7 @@ class AppDetail(AppSummary):
     screenshots: list[str]
     upstream_url: str | None
     homepage: str | None
-    sponsor_links: list[SponsorLink]
+    funding_links: list[FundingLink]
     risk_reasons: list[str]
     permissions: list[Permission]
     trust_findings: list[TrustFinding]
@@ -95,7 +95,7 @@ class Stats(BaseModel):
     apps: int
     on_flathub: int
     off_flathub: int
-    with_sponsor: int
+    with_funding: int
     by_risk: dict[str, int]
     by_trust: dict[str, int]
     last_crawls: list[dict]

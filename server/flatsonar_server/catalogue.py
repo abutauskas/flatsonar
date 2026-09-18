@@ -64,7 +64,7 @@ def apps_query(
     trust: str | None = None,
     source: SourceKind | None = None,
     oss_only: bool = True,
-    sponsor_only: bool = False,
+    funding_only: bool = False,
     ids: list[str] | None = None,
     on_flathub: bool | None = None,
 ) -> Select:
@@ -92,8 +92,8 @@ def apps_query(
         stmt = stmt.where(App.trust.in_(levels))
     if source:
         stmt = stmt.where(App.app_id.in_(select(InstallSource.app_id).where(InstallSource.kind == source)))
-    if sponsor_only:
-        stmt = stmt.where(func.cast(App.sponsor_links, String) != "[]")
+    if funding_only:
+        stmt = stmt.where(func.cast(App.funding_links, String) != "[]")
     if ids is not None:
         stmt = stmt.where(App.app_id.in_([i.strip() for i in ids if i.strip()][:500]))
     if on_flathub is not None:
@@ -146,7 +146,9 @@ def catalogue_stats(db: Session) -> dict[str, Any]:
     oss = select(App).where(App.is_oss.is_(True)).subquery()
     total = db.scalar(select(func.count()).select_from(oss)) or 0
     on_fh = db.scalar(select(func.count()).select_from(oss).where(oss.c.on_flathub.is_(True))) or 0
-    with_sponsor = db.scalar(
+    with_funding = db.scalar(
+        # oss.c indexes by the physical column name, which is still "sponsor_links"
+        # (App.funding_links maps to it; renaming the column itself needs a migration).
         select(func.count()).select_from(oss).where(func.cast(oss.c.sponsor_links, String) != "[]")
     ) or 0
     by_risk = {level: count for level, count in
@@ -158,7 +160,7 @@ def catalogue_stats(db: Session) -> dict[str, Any]:
         "apps": total,
         "on_flathub": on_fh,
         "off_flathub": total - on_fh,
-        "with_sponsor": with_sponsor,
+        "with_funding": with_funding,
         "by_risk": by_risk,
         "by_trust": by_trust,
         "last_crawls": [

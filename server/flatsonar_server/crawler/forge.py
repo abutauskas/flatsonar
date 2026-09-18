@@ -161,7 +161,7 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
         return []
 
     await forge.load_releases(ctx, repo)
-    sponsor = await _funding_links(ctx, forge, repo)
+    funding_yml_links = await _funding_links(ctx, forge, repo)
     upstream = normalise_repo_url(repo.html_url)
 
     out: list[Candidate] = []
@@ -228,7 +228,7 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
             developer_name=developer_from(upstream, meta.developer_name if meta else None),
             upstream_url=upstream.url if upstream else repo.html_url,
             homepage=(meta.homepage if meta else None) or repo.homepage,
-            sponsor_links=funding.merge(sponsor, funding.donation_link(meta.donation if meta else None)),
+            funding_links=funding.merge(funding_yml_links, funding.donation_link(meta.donation if meta else None)),
             latest_version=meta.latest_version if meta else None,
             stars=repo.stars,
             forks=repo.forks,

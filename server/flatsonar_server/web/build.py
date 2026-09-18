@@ -115,7 +115,7 @@ class Builder:
         stats = catalogue.catalogue_stats(db)
         categories = catalogue.category_counts(db)
         newest, _ = catalogue.page_apps(db, catalogue.apps_query(), "newest", 1, 8)
-        loved, _ = catalogue.page_apps(db, catalogue.apps_query(sponsor_only=True), "stars", 1, 8)
+        loved, _ = catalogue.page_apps(db, catalogue.apps_query(funding_only=True), "stars", 1, 8)
         hunted, _ = catalogue.page_apps(db, catalogue.apps_query(on_flathub=False), "stars", 1, 8)
         self.render("index.html", "/", stats=stats, newest=newest, loved=loved, hunted=hunted,
                    categories=categories[:12])
@@ -173,7 +173,7 @@ class Builder:
             "categories": a.categories, "license": a.license, "developer_name": a.developer_name,
             "risk_level": a.risk_level, "on_flathub": a.on_flathub, "flathub_verified": a.flathub_verified,
             "trust": a.trust, "stars": a.stars, "latest_version": a.latest_version,
-            "has_sponsor": bool(a.sponsor_links),
+            "has_funding": bool(a.funding_links),
         } for a in apps]
         _write(self.out / "apps.json", json.dumps(dump, indent=1))
 
