@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from .flatpak_cli import HOST_PREFIX, host_which
 
 log = logging.getLogger("flatsonar.scan")
 
@@ -24,14 +25,14 @@ class ScanResult:
 
 
 def clamav_available() -> bool:
-    return shutil.which("clamscan") is not None or shutil.which("clamdscan") is not None
+    return host_which("clamscan") is not None or host_which("clamdscan") is not None
 
 
 def scan(path: Path) -> ScanResult:
-    exe = shutil.which("clamdscan") or shutil.which("clamscan")
+    exe = host_which("clamdscan") or host_which("clamscan")
     if exe is None:
         return ScanResult(ran=False)
-    cmd = [exe, "--infected", "--no-summary"]
+    cmd = HOST_PREFIX + [exe, "--infected", "--no-summary"]
     if exe.endswith("clamscan"):
         cmd += ["--recursive"]
     else:

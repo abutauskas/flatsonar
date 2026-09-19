@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shlex
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -56,17 +57,21 @@ def _run(cmd: list[str], on_line: Callable[[str], None] | None = None, check: bo
     return out
 
 
+def host_which(name: str) -> str | None:
+    """Resolve a command on the *host*. ``shutil.which`` only ever sees this sandbox's
+    own filesystem, which never ships host tooling (flatpak, ostree, flatpak-builder,
+    clamscan, ...) - checking it always says "not found" regardless of the host."""
+    if not IN_SANDBOX:
+        return shutil.which(name)
+    try:
+        out = _run(["sh", "-c", f"command -v {shlex.quote(name)}"], check=False).strip()
+    except OSError:
+        return None
+    return out or None
+
+
 def available() -> bool:
-    if IN_SANDBOX:
-        # shutil.which only sees our own sandbox's filesystem, which never ships a
-        # flatpak binary; the real question is whether the *host* has one, which
-        # only flatpak-spawn (via _run's HOST_PREFIX) can actually answer.
-        try:
-            _run(["flatpak", "--version"])
-            return True
-        except (FlatpakError, OSError):
-            return False
-    return shutil.which("flatpak") is not None
+    return host_which("flatpak") is not None
 
 
 def default_arch() -> str:
@@ -209,7 +214,7 @@ def launch(app_id: str) -> None:
 
 def local_refs(app_id: str, repo: Path = FLATPAK_USER_REPO) -> list[str]:
     """Refs in the ostree repo for this app, e.g. ``flathub:app/org.x.Y/x86_64/stable``."""
-    if shutil.which("ostree") is None:
+    if host_which("ostree") is None:
         return []
     try:
         out = _run(["ostree", f"--repo={repo}", "refs"])
@@ -220,7 +225,7 @@ def local_refs(app_id: str, repo: Path = FLATPAK_USER_REPO) -> list[str]:
 
 def checkout(ref: str, dest: Path, repo: Path = FLATPAK_USER_REPO) -> Path:
     """Materialise a commit into ``dest`` so ClamAV can read it."""
-    if shutil.which("ostree") is None:
+    if host_which("ostree") is None:
         raise FlatpakError("ostree binary not found; install the 'ostree' package")
     if dest.exists():
         shutil.rmtree(dest)
@@ -240,7 +245,7 @@ def read_metadata(checkout_dir: Path) -> str | None:
 
 def build_from_manifest(manifest_path: Path, app_id: str, on_line=None) -> tuple[Path, str]:
     """Run flatpak-builder and export into a local repo. Returns (repo, ref)."""
-    if shutil.which("flatpak-builder") is None:
+    if host_which("flatpak-builder") is None:
         raise FlatpakError("flatpak-builder not found; install the 'flatpak-builder' package")
     repo = CACHE / "repo"
     build_dir = CACHE / "build" / app_id
