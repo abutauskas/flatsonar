@@ -6,7 +6,7 @@ import logging
 
 from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
-from .api import AppInfo, FlatsonarAPI, Page
+from .api import DEFAULT_API, AppInfo, FlatsonarAPI, Page
 from .asyncjob import run_async
 from .install import flatpak_cli as fp
 from .install import pipeline
@@ -134,12 +134,13 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         self.stack.add_named(grid_scroller, "grid")
         self.stack.add_named(Adw.StatusPage(icon_name="edit-find-symbolic", title="No apps found",
                                             description="Try another search or category."), "empty")
-        self.stack.add_named(Adw.StatusPage(icon_name="network-offline-symbolic", title="Can't reach the Flatsonar server",
-                                            description=f"Is it running at {self.api.base}?"), "offline")
-        loading = Adw.StatusPage(title="Loading…")
+        self.offline_page = Adw.StatusPage(icon_name="network-offline-symbolic",
+                                           title="Can't reach the Flatsonar server")
+        self.stack.add_named(self.offline_page, "offline")
+        self.loading_page = Adw.StatusPage(title="Loading…", description=self._cold_start_hint())
         spinner = Gtk.Spinner(spinning=True, width_request=32, height_request=32)
-        loading.set_child(spinner)
-        self.stack.add_named(loading, "loading")
+        self.loading_page.set_child(spinner)
+        self.stack.add_named(self.loading_page, "loading")
         content_tb.set_content(self.stack)
 
         self.status = Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END)
@@ -185,6 +186,20 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         row.set_child(box)
         return row
 
+    def _on_default_server(self) -> bool:
+        return self.api.base.rstrip("/") == DEFAULT_API.rstrip("/")
+
+    def _cold_start_hint(self) -> str:
+        if self._on_default_server():
+            return "The hosted server spins down when idle, so this can take up to a minute."
+        return ""
+
+    def _offline_description(self) -> str:
+        if self._on_default_server():
+            return ("The hosted server didn't respond in time. It runs on a free tier and can "
+                    "take a minute to wake up after being idle - try again shortly.")
+        return f"Is it running at {self.api.base}?"
+
     def reload(self, append: bool = False) -> None:
         if not append:
             self._page = 1
@@ -213,6 +228,7 @@ class FlatsonarWindow(Adw.ApplicationWindow):
 
         def _err(exc):
             log.warning("list failed: %s", exc)
+            self.offline_page.set_description(self._offline_description())
             self.stack.set_visible_child_name("offline")
 
         run_async(lambda: self.api.list_apps(q=q, category=cat, risk=risk, trust=trust, sort=sort, page=page_no),
