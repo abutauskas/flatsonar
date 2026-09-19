@@ -57,6 +57,15 @@ def _run(cmd: list[str], on_line: Callable[[str], None] | None = None, check: bo
 
 
 def available() -> bool:
+    if IN_SANDBOX:
+        # shutil.which only sees our own sandbox's filesystem, which never ships a
+        # flatpak binary; the real question is whether the *host* has one, which
+        # only flatpak-spawn (via _run's HOST_PREFIX) can actually answer.
+        try:
+            _run(["flatpak", "--version"])
+            return True
+        except (FlatpakError, OSError):
+            return False
     return shutil.which("flatpak") is not None
 
 
