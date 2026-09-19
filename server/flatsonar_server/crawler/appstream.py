@@ -9,6 +9,23 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
 _WS = re.compile(r"\s+")
+_CAMO = re.compile(r"^https?://camo\.githubusercontent\.com/[0-9a-f]{40}/([0-9a-f]+)$", re.IGNORECASE)
+
+
+def _decamo(url: str) -> str:
+    """GitHub's Camo image proxy rewrites embedded markdown images to
+    ``camo.githubusercontent.com/<hmac>/<hex-encoded-original-url>`` when it renders a
+    README. Some projects paste that rendered URL straight into their metainfo instead
+    of the real image link; Camo then 403s anyone who isn't github.com itself; it was
+    never meant for third-party embedding. Recover the original URL when the pattern
+    matches - it usually still works fine hotlinked."""
+    m = _CAMO.match(url)
+    if not m:
+        return url
+    try:
+        return bytes.fromhex(m.group(1)).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return url
 
 
 @dataclass
@@ -82,7 +99,7 @@ def parse_metainfo(text: str) -> MetaInfo | None:
     for shot in root.findall("screenshots/screenshot"):
         img = shot.find("image")
         if img is not None and (img.text or "").strip():
-            info.screenshots.append(img.text.strip())
+            info.screenshots.append(_decamo(img.text.strip()))
     info.categories = [c.text.strip() for c in root.findall("categories/category") if c.text and c.text.strip()]
     rel = root.find("releases/release")
     if rel is not None and rel.get("version"):
