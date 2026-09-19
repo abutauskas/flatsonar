@@ -244,6 +244,16 @@ gitlab.freedesktop.org and gitlab.xfce.org by default, since that is where a
 meaningful share of desktop Linux software actually lives. Self-hosted instances
 never show up in a gitlab.com-only search.
 
+**No Bitbucket.** Not an oversight: Bitbucket Cloud removed cross-workspace
+repository search entirely on April 14, 2026, and its one remaining
+search-adjacent endpoint (`workspaces/{workspace}/search/code`) is
+workspace-scoped only - it can't discover repos, only search within a workspace
+whose name you already know - and Atlassian has already announced it will be
+deprecated on November 1, 2026, on top of requiring OAuth (app passwords were
+retired in July 2026). There is currently no way to "hunt" Bitbucket the way
+Flatsonar hunts everywhere else; a crawler limited to a hardcoded list of known
+workspace names would not actually be hunting anything, so it is not built.
+
 A crawl commit is resilient by design: one manifest that fails to *commit* (as
 opposed to one that fails to even parse, which was already handled per-candidate)
 no longer takes the rest of a multi-thousand-app run down with it, and one source
