@@ -23,6 +23,7 @@ RISK_FILTERS = [("Any risk", None), ("Sandboxed only", "green"), ("Broad permiss
 TRUST_FILTERS = [("Any publisher", None), ("Verified creators", "verified"),
                  ("Verified or Flathub", "verified,reviewed"), ("Unverified only", "unverified,suspicious")]
 SORTS = [("Name", "name"), ("Most starred", "stars"), ("Recently updated", "updated"), ("Newest", "newest")]
+AUTO_REFRESH_SECONDS = 30 * 60  # background re-check cadence; installing is still always manual
 
 
 def _clear(flowbox: Gtk.FlowBox) -> None:
@@ -68,6 +69,7 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         self.refresh_installed()
         self.load_categories()
         self.reload()
+        GLib.timeout_add_seconds(AUTO_REFRESH_SECONDS, self._auto_check_updates)
 
     # --- layout -------------------------------------------------------------------
 
@@ -216,8 +218,11 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         run_async(lambda: self.api.list_apps(q=q, category=cat, risk=risk, trust=trust, sort=sort, page=page_no),
                   _done, _err)
 
-    def refresh_installed(self) -> None:
-        """Two steps: the local list is instant, asking the remotes for updates is not."""
+    def refresh_installed(self, announce: bool = False) -> None:
+        """Two steps: the local list is instant, asking the remotes for updates is not.
+        ``announce``: toast about updates this call newly finds (the periodic background
+        check uses this; the initial load and manual "check for updates" button don't need
+        to announce what the badge already shows as soon as it appears)."""
 
         def _have_list(apps: list[fp.InstalledApp]):
             self.installed = {a.app_id: a for a in apps}
@@ -227,10 +232,19 @@ class FlatsonarWindow(Adw.ApplicationWindow):
             run_async(lambda: self._find_updates(snapshot), _have_updates, lambda e: None)
 
         def _have_updates(ids: set[str]):
+            new = ids - self.updates
             self.updates = ids & set(self.installed)
             self._apply_installed()
+            if announce and new:
+                names = [self.installed[i].name or i for i in new if i in self.installed]
+                extra = f" and {len(names) - 3} more" if len(names) > 3 else ""
+                self.toast(f"Update available for {', '.join(names[:3])}{extra}.")
 
         run_async(fp.installed_apps, _have_list, lambda e: None)
+
+    def _auto_check_updates(self) -> bool:
+        self.refresh_installed(announce=True)
+        return True  # GLib.timeout_add_seconds: keep repeating
 
     def _find_updates(self, installed: dict[str, fp.InstalledApp]) -> set[str]:
         """Worker thread. Remote-installed apps: what the remotes say. Local builds and

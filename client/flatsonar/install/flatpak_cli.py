@@ -12,6 +12,7 @@ import shlex
 import shutil
 import subprocess
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -153,17 +154,22 @@ def deployed_metadata(app_id: str, installation: str = "user") -> str | None:
         return None
 
 
+def _updates_for(installation: str) -> set[str]:
+    try:
+        out = _run(["flatpak", "remote-ls", "--updates", "--app", f"--{installation}", "--columns=application"])
+    except (FlatpakError, OSError):
+        return set()
+    return {l.strip() for l in out.splitlines() if l.strip()}
+
+
 def updates_available() -> set[str]:
-    """App ids whose remote has a newer commit than what is deployed. Talks to the network;
-    a failure (offline, no polkit for system remotes) just means "none known"."""
-    ids: set[str] = set()
-    for installation in INSTALLATIONS:
-        try:
-            out = _run(["flatpak", "remote-ls", "--updates", "--app", f"--{installation}", "--columns=application"])
-        except (FlatpakError, OSError):
-            continue
-        ids.update(l.strip() for l in out.splitlines() if l.strip())
-    return ids
+    """App ids whose remote has a newer commit than what is deployed. Talks to the network -
+    one flatpak-spawn round trip per installation - so running them concurrently instead of
+    one after another roughly halves the wait. A failure (offline, no polkit for system
+    remotes) just means "none known" for that one installation."""
+    with ThreadPoolExecutor(max_workers=len(INSTALLATIONS)) as pool:
+        results = pool.map(_updates_for, INSTALLATIONS)
+    return set().union(*results)
 
 
 def ensure_remote(name: str, url: str, gpg_verify: bool = True) -> None:
