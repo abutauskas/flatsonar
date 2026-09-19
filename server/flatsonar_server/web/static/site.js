@@ -15,9 +15,12 @@ document.addEventListener('click', function (e) {
 });
 
 // Filter selects apply themselves; the Apply button is only for no-JS.
+// Forms marked data-ajax are enhanced further down (fetch instead of a full
+// reload), so leave those alone here rather than doing both.
 document.querySelectorAll('[data-autosubmit]').forEach(function (sel) {
   sel.addEventListener('change', function () {
     var form = sel.form;
+    if (form && form.hasAttribute('data-ajax')) return;
     if (form.requestSubmit) form.requestSubmit(); else form.submit();
   });
 });
@@ -247,4 +250,109 @@ document.addEventListener('keydown', function (e) {
 
   readStateFromUrl();
   render();
+})();
+
+// --- live catalogue: fetch-based filtering with a loading indicator -----------------
+//
+// Unlike the static build above, the dynamic server runs a real database query for
+// every /apps request - a network wait worth showing something for. Progressively
+// enhances the same data-ajax form: without JS (or if a fetch fails) it is a plain GET
+// form/link, working exactly as it did before this existed.
+(function () {
+  var form = document.getElementById('filters');
+  if (!form || !form.hasAttribute('data-ajax') || document.querySelector('[data-catalogue]')) return;
+
+  var radar = document.querySelector('[data-radar]');
+  var body = document.getElementById('results-body');
+  if (!body) return;
+
+  var FIELDS = { q: '', where: '', risk: '', trust: '', sort: 'name' };
+  var inflight = null;
+
+  function urlFromForm() {
+    var params = new URLSearchParams(new FormData(form));
+    Array.from(params.keys()).forEach(function (k) { if (!params.get(k)) params.delete(k); });
+    var qs = params.toString();
+    return form.getAttribute('action') + (qs ? '?' + qs : '');
+  }
+
+  // Keeps the toolbar itself in sync after a swap triggered by something other than
+  // the toolbar (a category or pagination link, browser back/forward) - otherwise the
+  // search box and dropdowns would silently show stale state once things are found.
+  function syncFormFromUrl(url) {
+    var params = new URL(url, location.origin).searchParams;
+    Object.keys(FIELDS).forEach(function (name) {
+      var el = form.querySelector('#' + name);
+      if (el) el.value = params.get(name) || FIELDS[name];
+    });
+    var cat = params.get('category') || '';
+    var catInput = form.querySelector('input[name=category]');
+    if (cat) {
+      if (!catInput) {
+        catInput = document.createElement('input');
+        catInput.type = 'hidden';
+        catInput.name = 'category';
+        form.appendChild(catInput);
+      }
+      catInput.value = cat;
+    } else if (catInput) {
+      catInput.remove();
+    }
+  }
+
+  function go(url, push) {
+    if (inflight) inflight.abort();
+    var controller = new AbortController();
+    inflight = controller;
+    if (radar) radar.hidden = false;
+    body.classList.add('is-loading');
+
+    fetch(url, { signal: controller.signal })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var newBody = doc.getElementById('results-body');
+        if (!newBody) throw new Error('no results-body in response');
+        body.innerHTML = newBody.innerHTML;
+        if (doc.title) document.title = doc.title;
+        syncFormFromUrl(url);
+        if (push) history.pushState({ ajax: true }, '', url);
+      })
+      .catch(function (err) {
+        if (err.name === 'AbortError') return; // superseded by a newer request
+        location.href = url; // something went wrong - fall back to a real navigation
+      })
+      .finally(function () {
+        if (inflight === controller) {
+          inflight = null;
+          if (radar) radar.hidden = true;
+          body.classList.remove('is-loading');
+        }
+      });
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+  }
+
+  var onChange = function () { go(urlFromForm(), true); };
+  form.querySelectorAll('[data-autosubmit]').forEach(function (sel) { sel.addEventListener('change', onChange); });
+  var q = form.querySelector('#q');
+  if (q) q.addEventListener('input', debounce(onChange, 250));
+  form.addEventListener('submit', function (e) { e.preventDefault(); onChange(); });
+
+  // Category and pagination links live inside elements that #results-body replaces
+  // wholesale on every swap, so delegate from the document instead of binding
+  // directly to nodes that stop existing after the first fetch.
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('.cats a, .pager a, #results-body .count a');
+    if (!a) return;
+    e.preventDefault();
+    go(a.href, true);
+  });
+
+  window.addEventListener('popstate', function () {
+    go(location.pathname + location.search, false);
+  });
 })();

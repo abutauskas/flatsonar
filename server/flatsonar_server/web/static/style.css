@@ -237,6 +237,14 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .pager a:hover { border-color: var(--accent); }
 .pager .disabled { color: var(--muted); opacity: .6; }
 .pager .where { border: none; color: var(--muted); }
+
+.radar-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 40px 0; color: var(--accent); }
+.radar-loading[hidden] { display: none; }
+.radar-loading span { color: var(--muted); font-size: .9rem; }
+.radar-sweep { transform-origin: 20px 20px; animation: radar-spin 1.1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .radar-sweep { animation-duration: 3s; } }
+@keyframes radar-spin { to { transform: rotate(360deg); } }
+#results-body.is-loading { opacity: .4; pointer-events: none; }
 .loadmore { text-align: center; margin: 36px 0 0; }
 
 /* --- app page --------------------------------------------------------------------- */

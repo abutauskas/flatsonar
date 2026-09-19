@@ -17,7 +17,7 @@
   </aside>
 
   <section class="results">
-    <form class="toolbar" action="/apps" method="get" id="filters">
+    <form class="toolbar" action="/apps" method="get" id="filters" data-ajax>
       {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
       <label class="visually-hidden" for="q">Search</label>
       <input id="q" class="search" type="search" name="q" value="{{ q }}" placeholder="Search name, summary, id, developer…">
@@ -40,6 +40,18 @@
       <button class="btn primary nojs" type="submit">Apply</button>
     </form>
 
+    <div class="radar-loading" data-radar hidden aria-hidden="true">
+      <svg viewBox="0 0 40 40" width="28" height="28">
+        <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="2" opacity=".25"/>
+        <g class="radar-sweep">
+          <path d="M20,20 L20,3 A17,17 0 0,1 35.97,14.18 Z" fill="currentColor" opacity=".18"/>
+          <line x1="20" y1="20" x2="20" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </g>
+      </svg>
+      <span>Searching…</span>
+    </div>
+
+    <div id="results-body">
     <p class="count">
       {{ '{:,}'.format(total) }} app{{ '' if total == 1 else 's' }}
       {% if q %}matching “{{ q }}”{% endif %}
@@ -63,6 +75,7 @@
       {% if page < pages %}<a href="{{ query_url(request, page=page+1) }}" rel="next">Next →</a>{% else %}<span class="disabled">Next →</span>{% endif %}
     </nav>
     {% endif %}
+    </div>
   </section>
 </div>
 {% endblock %}
