@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-DEFAULT_API = os.environ.get("FLATSONAR_API", "http://localhost:8000")
+DEFAULT_API = os.environ.get("FLATSONAR_API", "https://flatsonar.onrender.com")
 
 
 @dataclass
@@ -83,7 +83,9 @@ class Page:
 class FlatsonarAPI:
     def __init__(self, base_url: str = DEFAULT_API):
         self.base = base_url.rstrip("/")
-        self._client = httpx.Client(base_url=self.base, timeout=20.0, headers={"User-Agent": "Flatsonar-client/0.1"})
+        # The free-tier default server spins down after idling and can take 50s+ to
+        # wake back up on the next request; a short timeout would fail that first call.
+        self._client = httpx.Client(base_url=self.base, timeout=75.0, headers={"User-Agent": "Flatsonar-client/0.1"})
 
     def list_apps(self, q: str | None = None, category: str | None = None, risk: str | None = None,
                   trust: str | None = None, sort: str = "name", page: int = 1, per_page: int = 48,
