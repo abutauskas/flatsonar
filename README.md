@@ -11,6 +11,19 @@ What it does instead is work out **who is publishing it**, **what its build does
 and **what its sandbox allows**, and tell you before anything runs. If something
 looks off it asks you to press **Sure** twice. After that, it's your call.
 
+## Get it
+
+Browse the catalogue at **[flatsonar.org](https://flatsonar.org)**, or install the desktop
+client from the [latest release](https://github.com/abutauskas/flatsonar/releases/latest):
+
+```sh
+flatpak install flatsonar.flatpak
+```
+
+It talks to the hosted API at `https://flatsonar.onrender.com` by default - no server setup
+needed. (That server is on a free instance that spins down when idle, so the first request
+after a quiet spell can take up to a minute.)
+
 ## Layout
 
 | Directory | What | Runs on |
