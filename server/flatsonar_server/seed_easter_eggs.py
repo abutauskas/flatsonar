@@ -38,7 +38,7 @@ BRANCH = "master"
 MANIFEST_PATH = "client/io.github.abutauskas.Flatsonar.json"
 RAW_MANIFEST_URL = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{MANIFEST_PATH}"
 ICON_URL = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/client/data/icons/io.github.abutauskas.Flatsonar.svg"
-BUNDLE_URL = f"{REPO_URL}/releases/download/v0.1.0/flatsonar.flatpak"
+BUNDLE_URL = f"{REPO_URL}/releases/download/v1.0.0/flatsonar.flatpak"
 
 SUMMARY = "An F-Droid-style store for open-source Flatpak apps. Yes, it lists itself."
 
@@ -96,7 +96,7 @@ def build_candidate() -> Candidate:
         license="GPL-3.0-or-later",
         developer_name="abutauskas",
         upstream_url=REPO_URL,
-        latest_version="0.1.0",
+        latest_version="1.0.0",
         stars=stats.get("stargazers_count"),
         forks=stats.get("forks_count"),
         repo_created_at=_parse_ts(stats.get("created_at")),

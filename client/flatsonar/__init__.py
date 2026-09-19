@@ -9,4 +9,4 @@ except (ImportError, ValueError):  # no PyGObject here (server-side tests); UI m
     pass
 
 APP_ID = "io.github.abutauskas.Flatsonar"
-VERSION = "0.1.0"
+VERSION = "1.0.0"

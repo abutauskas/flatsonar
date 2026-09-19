@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flatsonar-server"
-version = "0.1.0"
+version = "1.0.0"
 description = "Flatsonar API server and crawler: hunts open-source Flatpak apps across Flathub, GitHub, GitLab and Codeberg"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.12"

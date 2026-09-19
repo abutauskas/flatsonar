@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flatsonar-core"
-version = "0.1.0"
+version = "1.0.0"
 description = "Shared Flatpak manifest parsing, sandbox risk scoring and license checks for Flatsonar"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.12"

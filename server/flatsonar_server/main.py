@@ -50,7 +50,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app = FastAPI(
     title="Flatsonar",
     description="Open-source Flatpak apps, hunted from everywhere. Credits creators, flags risky sandboxes.",
-    version="0.1.0",
+    version="1.0.0",
     lifespan=_lifespan,
 )
 app.add_middleware(

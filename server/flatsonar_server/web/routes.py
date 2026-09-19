@@ -34,7 +34,7 @@ SITE = {
     "tagline": "Open-source Flatpak apps, hunted from everywhere",
     "repo": "https://github.com/abutauskas/flatsonar",
     "issues": "https://github.com/abutauskas/flatsonar/issues",
-    "version": "0.1.0",
+    "version": "1.0.0",
 }
 
 # Wording shared with the desktop client (client/flatsonar/widgets.py).
