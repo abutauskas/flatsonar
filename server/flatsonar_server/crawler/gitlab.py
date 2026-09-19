@@ -43,6 +43,7 @@ class GitLabForge:
             archived=bool(p.get("archived")),
             fork=bool(p.get("forked_from_project")),
             avatar_url=p.get("avatar_url") or ns.get("avatar_url"),
+            topics=list(p.get("topics") or p.get("tag_list") or []),  # tag_list: older GitLab instances
         )
 
     async def list_repos(self, ctx: CrawlContext, limit: int | None) -> AsyncIterator[RepoInfo]:

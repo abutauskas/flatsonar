@@ -82,6 +82,7 @@ FLATSONAR_API={{ base_url(request) }} python -m flatsonar</code><button class="c
         <li>Use an id you own. <code>io.github.you.*</code> is verified automatically when the repository is under <code>you</code>; a custom domain is verified by serving <code>https://your.domain/.well-known/org.flathub.VerifiedApps.txt</code> with the id on a line.</li>
         <li>Pin your sources (<code>sha256</code> for archives, <code>commit</code> for git), keep <code>finish-args</code> tight, and the badges take care of themselves.</li>
       </ul>
+      <p>Don't want your project here at all? Add the topic <code>noflatsonar</code> (or <code>no-flatsonar</code>) to the repository and the next crawl removes it, without reading anything further.</p>
       <p>Something wrong with a listing: credit, license, an impostor? <a href="{{ site.issues }}" rel="noopener">Open an issue</a>.</p>
     </section>
 

@@ -234,6 +234,12 @@ catalogue" section and the Atom feed meaningful between runs.
   become one-click bundle installs, `.flatpakrepo` files become remotes, and anything
   with only a manifest gets built locally with `flatpak-builder`.
 
+**Opting out.** Tag a repository with the topic `noflatsonar` (or `no-flatsonar`) on
+GitHub, GitLab or Codeberg and the crawler skips it entirely - it never reads the
+manifest, and if the repo was already listed from before the topic was added, the
+next crawl removes that listing. Checked before the tree is even fetched, straight
+off the repo metadata every search already returns.
+
 Only OSI/FSF-approved SPDX licenses are listed. Proprietary apps on Flathub are skipped.
 Verification is never a filter for the crawler: unverified publishers are indexed
 like everyone else and labelled honestly.

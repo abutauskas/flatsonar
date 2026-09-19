@@ -54,8 +54,15 @@ class RepoInfo:
     archived: bool = False
     fork: bool = False
     avatar_url: str | None = None
+    topics: list[str] = field(default_factory=list)
     tree: list[str] = field(default_factory=list)  # file paths at default branch
     release_assets: list[tuple[str, str]] = field(default_factory=list)  # (name, url)
+
+
+# A maintainer's own opt-out, checked against the repo's topics before anything else -
+# before the tree is even fetched, so an opted-out repo's manifest is never read at all,
+# not just left out of the catalogue.
+_OPT_OUT_TOPICS = {"noflatsonar", "no-flatsonar"}
 
 
 def parse_timestamp(value: str | None) -> datetime | None:
@@ -155,6 +162,11 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
         return []
     if repo.owner.lower() == "flathub":
         return []  # packaging repos: handled by the Flathub source
+    if any(t.lower() in _OPT_OUT_TOPICS for t in repo.topics):
+        # The maintainer asked not to be listed. If a row already exists from before
+        # the topic was added, this removes it; either way nothing here is read further.
+        upstream = normalise_repo_url(repo.html_url)
+        return [Candidate(app_id="", upstream_url=upstream.url if upstream else repo.html_url, remove=True)]
     await forge.load_tree(ctx, repo)
     manifest_paths = find_manifests(repo.tree)
     if not manifest_paths:

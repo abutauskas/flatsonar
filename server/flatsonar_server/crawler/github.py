@@ -62,6 +62,7 @@ class GitHubForge:
             archived=bool(r.get("archived")),
             fork=bool(r.get("fork")),
             avatar_url=(r.get("owner") or {}).get("avatar_url"),
+            topics=list(r.get("topics") or []),
         )
 
     async def _search_repos(self, ctx: CrawlContext, query: str, budget: int) -> AsyncIterator[dict]:

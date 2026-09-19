@@ -42,6 +42,7 @@ class GiteaForge:
             archived=bool(r.get("archived")),
             fork=bool(r.get("fork")),
             avatar_url=owner.get("avatar_url"),
+            topics=list(r.get("topics") or []),
         )
 
     async def list_repos(self, ctx: CrawlContext, limit: int | None) -> AsyncIterator[RepoInfo]:

@@ -30,6 +30,9 @@ build-dir/
 repo/
 *.flatpak
 
+# wrangler (Cloudflare Pages CLI)
+.wrangler/
+
 # Editors / OS
 .vscode/
 .idea/

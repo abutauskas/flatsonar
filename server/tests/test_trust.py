@@ -10,7 +10,7 @@ from sqlalchemy import create_engine, inspect, text
 
 from flatsonar_core import TrustLevel, parse_manifest_text
 from flatsonar_server.crawler.base import Candidate, Fetched, Skipped, SourceSpec, upsert_candidate
-from flatsonar_server.crawler.forge import RepoInfo, parse_timestamp
+from flatsonar_server.crawler.forge import RepoInfo, candidates_from_repo, parse_timestamp
 from flatsonar_server.crawler.trust import assess
 from flatsonar_server.models import App, InstallSource, SourceKind
 
@@ -226,6 +226,35 @@ def test_lookalike_name_gets_a_note(session):
     notes = [f for f in app.trust_findings if f["check"] == "publisher:lookalike"]
     assert len(notes) == 1 and "org.gnome.Calculator" in notes[0]["reason"]
     assert app.trust == "verified"  # a note, not a verdict
+
+
+# --- opt-out: a maintainer's own "noflatsonar" topic ---------------------------------
+
+
+def test_opt_out_topic_short_circuits_before_reading_anything():
+    for topics in (["flatpak", "noflatsonar"], ["No-Flatsonar"]):
+        repo = _repo(topics=topics)
+        cands = asyncio.run(candidates_from_repo(None, None, repo))  # forge/ctx unused on this path
+        assert len(cands) == 1
+        assert cands[0].remove is True
+        assert cands[0].upstream_url == "https://github.com/alice/foo"
+
+
+def test_opt_out_removes_an_existing_listing(session):
+    _write(session, _cand("com.example.Foo"), _repo())
+    assert session.get(App, "com.example.Foo") is not None
+
+    app, created = upsert_candidate(session, Candidate(app_id="", upstream_url="https://github.com/alice/foo", remove=True))
+    session.commit()
+    assert app is None and created is False
+    assert session.get(App, "com.example.Foo") is None
+
+
+def test_opt_out_on_a_never_indexed_repo_is_a_noop(session):
+    app, created = upsert_candidate(
+        session, Candidate(app_id="", upstream_url="https://github.com/nobody/nothing", remove=True))
+    session.commit()
+    assert app is None and created is False
 
 
 # --- api ------------------------------------------------------------------------------

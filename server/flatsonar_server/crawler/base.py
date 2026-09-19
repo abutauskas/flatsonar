@@ -17,7 +17,7 @@ from typing import Any, Protocol, TypeVar
 from urllib.parse import urlsplit
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from flatsonar_core import Finding, Manifest, RiskLevel, TrustLevel, is_open_source, score_finish_args
@@ -215,6 +215,7 @@ class Candidate:
     (Flathub) without clobbering it."""
 
     app_id: str
+    remove: bool = False  # the maintainer opted out (see forge.py's _OPT_OUT_TOPICS); app_id may be blank
     name: str | None = None
     summary: str | None = None
     description: str | None = None
@@ -318,9 +319,18 @@ def _guard_collision(db: Session, app: App, cand: Candidate) -> None:
                   f"candidate {cand.upstream_url} ({cand.trust_level.label}) skipped")
 
 
-def upsert_candidate(db: Session, cand: Candidate) -> tuple[App, bool]:
+def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
     """Write a candidate into the DB. Returns (app, created). Raises :class:`Skipped`
-    when a different publisher already owns the app id."""
+    when a different publisher already owns the app id.
+
+    A candidate with ``remove`` set (a maintainer's opt-out) instead deletes any
+    existing row for its upstream repo - InstallSource/ManifestRecord cascade at the
+    database level - and returns (None, False); there is no app_id to look anything
+    else up by, since the point is never having read the manifest that would give one."""
+    if cand.remove:
+        if cand.upstream_url:
+            db.execute(delete(App).where(App.upstream_url == cand.upstream_url))
+        return None, False
     app = db.get(App, cand.app_id)
     created = app is None
     if created:
