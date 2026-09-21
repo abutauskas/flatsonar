@@ -259,7 +259,9 @@ def render_404(request: Request) -> HTMLResponse:
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
 def robots(request: Request):
-    return f"User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: {base_url(request)}/sitemap.xml\n"
+    return (f"User-agent: *\nAllow: /\n"
+            f"Disallow: /api/\nDisallow: /admin/\nDisallow: /docs\nDisallow: /redoc\nDisallow: /openapi.json\n"
+            f"Sitemap: {base_url(request)}/sitemap.xml\n")
 
 
 @router.get("/sitemap.xml")

@@ -5,11 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ site.name }} - {{ site.tagline }}{% endblock %}</title>
   <meta name="description" content="{% block description %}Open-source Flatpak apps, hunted from Flathub, GitHub, GitLab and Codeberg, with credit to their creators and a warning before anything risky.{% endblock %}">
+  <link rel="canonical" href="{% block canonical %}{{ base_url(request) }}{{ request.url.path }}{% endblock %}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ site.name }}">
   <meta property="og:title" content="{{ self.title() }}">
   <meta property="og:description" content="{{ self.description() }}">
-  <meta property="og:url" content="{{ base_url(request) }}{{ request.url.path }}">
+  <meta property="og:url" content="{{ self.canonical() }}">
+  <meta property="og:image" content="{% block ogimage %}{{ base_url(request) }}/static/og-image.png{% endblock %}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ self.title() }}">
+  <meta name="twitter:description" content="{{ self.description() }}">
+  <meta name="twitter:image" content="{{ self.ogimage() }}">
   {% block head %}{% endblock %}
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate" type="application/atom+xml" title="New apps on {{ site.name }}" href="/feed.xml">

@@ -2,6 +2,14 @@
 {% from "_macros.html" import app_grid %}
 {% block bodyclass %}home{% endblock %}
 {% block topsearch %}{% endblock %}
+{% block head %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "WebSite", "name": site.name, "url": base_url(request) ~ "/",
+  "description": self.description(),
+  "potentialAction": {"@type": "SearchAction", "target": base_url(request) ~ "/apps?q={search_term_string}",
+                       "query-input": "required name=search_term_string"}
+}|tojson }}</script>
+{% endblock %}
 
 {% block content %}
 <section class="hero">

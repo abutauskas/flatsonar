@@ -2,10 +2,17 @@
 {% from "_macros.html" import app_grid %}
 {% block title %}{% if q %}“{{ q }}” - {% elif category %}{{ category }} apps - {% endif %}Apps - {{ site.name }}{% endblock %}
 {% block description %}Browse {{ total }} open-source Flatpak apps{% if category %} in {{ category }}{% endif %}, with sandbox risk and publisher trust for each.{% endblock %}
+{% block canonical %}{{ base_url(request) }}/apps{% if category %}?category={{ category|urlencode }}{% endif %}{% endblock %}
 {% block topsearch %}{% endblock %}
+{% block head %}
+{% if q or risk or trust or maintenance or where or sort != 'name' or page > 1 %}
+<meta name="robots" content="noindex,follow">
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="wrap catalogue">
+  <h1 class="visually-hidden">{% if q %}Search results for “{{ q }}”{% elif category %}{{ category }} apps{% else %}Browse open-source Flatpak apps{% endif %}</h1>
   <aside class="side">
     <h3>Categories</h3>
     <ul class="cats">

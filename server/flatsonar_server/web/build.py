@@ -163,7 +163,8 @@ class Builder:
     def _write_robots(self) -> None:
         base = self.base_path or ""
         _write(self.out / "robots.txt",
-              f"User-agent: *\nAllow: {base or '/'}\nDisallow: {base}/api/\nSitemap: {self.site_url}/sitemap.xml\n")
+              f"User-agent: *\nAllow: {base or '/'}\nDisallow: {base}/api/\nDisallow: {base}/admin/\n"
+              f"Sitemap: {self.site_url}/sitemap.xml\n")
 
     def _write_apps_json(self, apps: list[App]) -> None:
         """A static stand-in for the JSON API GitHub Pages can't run: every field

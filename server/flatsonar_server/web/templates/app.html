@@ -2,15 +2,22 @@
 {% from "_macros.html" import icon, risk_pill, trust_pill, maintenance_pill %}
 {% block title %}{{ app.name }} - {{ site.name }}{% endblock %}
 {% block description %}{{ app.summary or (app.name ~ ' on ' ~ site.name) }}{% endblock %}
+{% block canonical %}{{ base_url(request) }}/apps/{{ app.app_id }}{% endblock %}
+{% block ogimage %}{{ app.icon_url or (base_url(request) ~ '/static/og-image.png') }}{% endblock %}
 {% block head %}
-<link rel="canonical" href="{{ base_url(request) }}/apps/{{ app.app_id }}">
-{% if app.icon_url %}<meta property="og:image" content="{{ app.icon_url }}">{% endif %}
 <script type="application/ld+json">{{ {
   "@context": "https://schema.org", "@type": "SoftwareApplication", "name": app.name,
   "description": app.summary, "operatingSystem": "Linux", "applicationCategory": (app.categories or [""])[0],
   "license": app.license, "url": base_url(request) ~ "/apps/" ~ app.app_id, "softwareVersion": app.latest_version,
   "author": {"@type": "Organization", "name": app.developer_name} if app.developer_name else None,
   "offers": {"@type": "Offer", "price": "0"}
+}|tojson }}</script>
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": base_url(request) ~ "/"},
+    {"@type": "ListItem", "position": 2, "name": "Apps", "item": base_url(request) ~ "/apps"},
+    {"@type": "ListItem", "position": 3, "name": app.name, "item": base_url(request) ~ "/apps/" ~ app.app_id}
+  ]
 }|tojson }}</script>
 {% endblock %}
 
