@@ -17,6 +17,11 @@ unverified app *look* verified. Every candidate leaves here with a
 Repository age, star count and a ``.flatpak`` bundle hosted somewhere other than
 the project's forge add yellow notes. Yellow never changes the level on its own:
 being new is not a crime, but the client shows every note before installing.
+
+``assess`` also fills :class:`flatsonar_core.MaintenanceLevel` alongside trust: a
+different question (is anyone still tending this?) answered from the same repo
+signal (:func:`flatsonar_core.assess_maintenance`), so it rides along in one pass
+rather than a second walk over every candidate.
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ from flatsonar_core import (
     OwnershipResult,
     RiskLevel,
     TrustLevel,
+    assess_maintenance,
     audit_manifest,
     check_ownership,
     ownership_finding,
@@ -131,4 +137,10 @@ async def assess(ctx: CrawlContext, cand: Candidate, repo: RepoInfo | None = Non
 
     cand.trust = trust_from_findings(base, findings)
     cand.trust_findings = findings
+
+    archived = repo.archived if repo is not None else bool(cand.archived)
+    pushed_at = repo.pushed_at if repo is not None else cand.repo_pushed_at
+    maint = assess_maintenance(on_flathub=bool(cand.on_flathub), archived=archived, pushed_at=pushed_at)
+    cand.maintenance = maint.level
+    cand.maintenance_findings = maint.findings
     return cand

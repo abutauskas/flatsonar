@@ -41,13 +41,17 @@ def build_sources(names: list[str]) -> list[Source]:
     from .flathub import FlathubSource
     from .github import GitHubSource
     from .gitlab import GitLabSource
+    from .remotes import ThirdPartyRemotesSource
 
     gitlab_instances = ("https://gitlab.com", *(u.strip() for u in settings.gitlab_instances.split(",") if u.strip()))
+    codeberg_instances = ("https://codeberg.org", *(u.strip() for u in settings.codeberg_instances.split(",") if u.strip()))
+    third_party_remotes = [u.strip() for u in settings.third_party_remotes.split(",") if u.strip()]
     table = {
         "flathub": lambda: FlathubSource(),
         "github": lambda: GitHubSource(settings.github_token),
         "gitlab": lambda: GitLabSource(settings.gitlab_token, base_urls=gitlab_instances),
-        "codeberg": lambda: CodebergSource(settings.codeberg_token),
+        "codeberg": lambda: CodebergSource(settings.codeberg_token, base_urls=codeberg_instances),
+        "remotes": lambda: ThirdPartyRemotesSource(third_party_remotes),
     }
     if names == ["all"]:
         names = list(table)

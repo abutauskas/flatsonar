@@ -33,6 +33,10 @@
       <select id="trust" name="trust" data-autosubmit>
         {% for value, label in TRUST_FILTERS %}<option value="{{ value }}" {% if trust == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
+      <label class="visually-hidden" for="maintenance">Maintenance</label>
+      <select id="maintenance" name="maintenance" data-autosubmit>
+        {% for value, label in MAINTENANCE_FILTERS %}<option value="{{ value }}" {% if maintenance == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
       <label class="visually-hidden" for="sort">Sort</label>
       <select id="sort" name="sort" data-autosubmit>
         {% for value, label in SORT_LABELS %}<option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
@@ -56,7 +60,7 @@
       {{ '{:,}'.format(total) }} app{{ '' if total == 1 else 's' }}
       {% if q %}matching “{{ q }}”{% endif %}
       {% if category %}in {{ category }}{% endif %}
-      {% if q or category or risk or trust or where %}· <a href="/apps">clear filters</a>{% endif %}
+      {% if q or category or risk or trust or maintenance or where %}· <a href="/apps">clear filters</a>{% endif %}
     </p>
 
     {% if apps %}

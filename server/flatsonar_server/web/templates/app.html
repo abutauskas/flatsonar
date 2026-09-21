@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, risk_pill, trust_pill %}
+{% from "_macros.html" import icon, risk_pill, trust_pill, maintenance_pill %}
 {% block title %}{{ app.name }} - {{ site.name }}{% endblock %}
 {% block description %}{{ app.summary or (app.name ~ ' on ' ~ site.name) }}{% endblock %}
 {% block head %}
@@ -25,9 +25,11 @@
       <div class="pills big">
         {{ risk_pill(app.risk_level) }}
         {{ trust_pill(app.trust) }}
+        {% if app.maintenance and app.maintenance != 'active' %}{{ maintenance_pill(app.maintenance) }}
+        {% elif app.archived %}<span class="pill" title="The upstream repository is archived; Flathub still ships this build">Archived</span>{% endif %}
+        {% if not app.manifest_ok %}<span class="pill yellow" title="The crawler's last visit could no longer parse this app's manifest; the listing below may be out of date">Build may be broken</span>{% endif %}
         {% if app.license %}<span class="pill" title="SPDX license">{{ app.license }}</span>{% endif %}
         {% if app.latest_version %}<span class="pill" title="Latest version">v{{ app.latest_version }}</span>{% endif %}
-        {% if app.archived %}<span class="pill" title="The upstream repository is archived; the app may still work fine">Archived</span>{% endif %}
       </div>
     </div>
     <div class="head-actions">
@@ -105,6 +107,23 @@
         <p class="fine">The index has not assessed this publisher yet.</p>
         {% endif %}
       </section>
+
+      <section id="maintenance">
+        <h2>Maintenance</h2>
+        <p class="sub">{{ MAINTENANCE_TIP.get(app.maintenance, '') }}</p>
+        {% if not app.manifest_ok %}
+        <p class="fine"><strong>Build may be broken:</strong> the crawler's last visit could no longer parse this app's manifest ({{ app.manifest_error }}). The information below is from the last time it did.</p>
+        {% endif %}
+        {% if app.maintenance_findings %}
+        <ul class="findings">
+          {% for f in app.maintenance_findings %}
+          <li class="{{ f.level }}"><span class="lvl" aria-label="{{ f.level }}"></span><div><div class="what">{{ f.reason }}</div><code>{{ f.check }}</code></div></li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="fine">No staleness signals: recent activity, or built and reviewed by Flathub.</p>
+        {% endif %}
+      </section>
     </div>
 
     <aside class="aside">
@@ -148,6 +167,12 @@
           {% if app.manifest %}<li><a href="{{ manifest_href or ('/api/apps/' ~ app.app_id ~ '/manifest') }}">Manifest (JSON)</a></li>{% endif %}
           <li><a href="{{ site.issues }}/new?title={{ ('Listing: ' ~ app.app_id)|urlencode }}" rel="noopener">Report this listing</a></li>
         </ul>
+      </section>
+
+      <section class="panel">
+        <h3>For developers</h3>
+        <p class="fine">Link back to this listing from your README:</p>
+        <div class="cmd" data-copy><code>[![Get it on {{ site.name }}](https://img.shields.io/badge/Get_it_on-{{ site.name }}-6f42c1)]({{ base_url(request) }}/apps/{{ app.app_id }})</code><button class="copy" type="button" aria-label="Copy badge markdown">Copy</button></div>
       </section>
     </aside>
   </div>

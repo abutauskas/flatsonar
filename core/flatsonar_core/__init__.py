@@ -2,6 +2,7 @@
 publisher provenance and build-time audit."""
 
 from .audit import audit_level, audit_manifest
+from .maintenance import MaintenanceLevel, MaintenanceResult, assess_maintenance
 from .manifest import Manifest, ManifestSource, parse_manifest, parse_manifest_text
 from .metadata import metadata_app_id, metadata_to_finish_args
 from .provenance import Ownership, OwnershipResult, TrustLevel, check_ownership, ownership_finding, trust_from_findings
@@ -10,6 +11,8 @@ from .spdx import is_open_source
 
 __all__ = [
     "Finding",
+    "MaintenanceLevel",
+    "MaintenanceResult",
     "Manifest",
     "ManifestSource",
     "Ownership",
@@ -17,6 +20,7 @@ __all__ = [
     "RiskLevel",
     "RiskReport",
     "TrustLevel",
+    "assess_maintenance",
     "audit_level",
     "audit_manifest",
     "check_ownership",

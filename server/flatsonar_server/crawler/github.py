@@ -20,16 +20,32 @@ REPO_QUERIES = [
     "topic:flatpak",
     "topic:flatpak-app",
     "topic:flatpak-builder",
+    "topic:flatpak-manifest",
     "topic:libadwaita",
     "topic:gtk4 flatpak",
+    "topic:gtk3 flatpak",
     "topic:kirigami flatpak",
+    "topic:electron flatpak",
 ]
 # Legacy code search: each query is capped at 1000 results, so vary the extension.
 CODE_QUERIES = [
     '"app-id" "finish-args" "modules" extension:json',
     '"app-id" "finish-args" "modules" extension:yml',
     '"app-id" "finish-args" "modules" extension:yaml',
+    # Path-based: catches manifests that never literally contain "app-id" (e.g. the
+    # legacy `id:` key - parse_manifest_text already accepts data.get("app-id") or
+    # data.get("id")) or "finish-args"/"modules" as bare strings. Only needs to find
+    # the repo, not the exact file: find_manifests()/candidates_from_repo() re-validate
+    # the tree and manifest content independently of which query found the repo, so a
+    # path-based false positive costs a little crawl time, not bad data.
+    'path:flatpak extension:json',
+    'path:flatpak extension:yml',
+    'path:flatpak extension:yaml',
 ]
+# WATCH: GitHub's /search/code responses carry a Link header pointing at a (currently
+# 404) blog post about search deprecation, sunset date 2026-09-27. GitHub staff haven't
+# confirmed scope - it looks like it may only affect the sort/order params, which this
+# code doesn't use - but if code search stops working outright after that date, start here.
 
 
 class GitHubForge:
@@ -105,19 +121,30 @@ class GitHubForge:
         return self._repo_info(data) if data and "full_name" in data else None
 
     async def list_repos(self, ctx: CrawlContext, limit: int | None) -> AsyncIterator[RepoInfo]:
+        # Topic search and code search each get their own budget. The `flatpak` topic
+        # is opt-in and most flatpak-shipping repos never add it, so code search is the
+        # higher-recall half of the hunt, not a fallback - it must run in full even when
+        # topic search alone already reached `budget` distinct repos. Sharing one pool
+        # meant code search could go entirely unused on an ordinary crawl, and only gets
+        # worse as the tagged corpus grows.
         budget = limit or 2000
         seen: set[str] = set()
+        by_topic = 0
         for q in REPO_QUERIES:
             async for r in self._search_repos(ctx, q, budget):
                 if r["full_name"] in seen:
                     continue
                 seen.add(r["full_name"])
                 yield self._repo_info(r)
-                if len(seen) >= budget:
-                    return
+                by_topic += 1
+                if by_topic >= budget:
+                    break
+            if by_topic >= budget:
+                break
         if not self.token:
             log.warning("no GITHUB_TOKEN: skipping code search")
             return
+        by_code = 0
         for q in CODE_QUERIES:
             async for full in self._search_code(ctx, q, budget):
                 if full in seen:
@@ -126,8 +153,11 @@ class GitHubForge:
                 repo = await self._get_repo(ctx, full)
                 if repo:
                     yield repo
-                if len(seen) >= budget:
-                    return
+                by_code += 1
+                if by_code >= budget:
+                    break
+            if by_code >= budget:
+                break
 
     async def load_tree(self, ctx: CrawlContext, repo: RepoInfo) -> None:
         url = f"{API}/repos/{repo.full_name}/git/trees/{quote(repo.default_branch)}?recursive=1"

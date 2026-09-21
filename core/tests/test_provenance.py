@@ -47,6 +47,12 @@ from flatsonar_core.provenance import domain_of, repo_ref, same_repo
         # Custom domains: nothing to compare against without a well-known file.
         ("com.example.Foo", "https://github.com/alice/foo", [], Ownership.UNKNOWN),
         ("com.example.Foo", None, [], Ownership.UNKNOWN),
+        # A forge/vendor namespace claimed with no hosting location at all to check
+        # it against (e.g. an app known only from a third-party remote's catalogue,
+        # not from crawling a repository): unproven, not contradicted - never
+        # impersonation on the strength of an *absent* hosting location alone.
+        ("io.github.alice.Foo", None, [], Ownership.UNKNOWN),
+        ("org.mozilla.firefox", None, [], Ownership.UNKNOWN),
     ],
 )
 def test_check_ownership(app_id, hosted_at, builds_from, status):

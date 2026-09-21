@@ -23,6 +23,7 @@ def list_apps(
     category: str | None = None,
     risk: str | None = Query(None, pattern="^(green|yellow|red)$"),
     trust: str | None = Query(None, description="Publisher trust, comma-separated: verified,reviewed,unverified,suspicious"),
+    maintenance: str | None = Query(None, description="Maintenance signal, comma-separated: active,stale,abandoned"),
     source: SourceKind | None = Query(None, description="Only apps installable via this kind"),
     ids: str | None = Query(None, description="Only these app ids, comma-separated (the client's installed list)"),
     oss_only: bool = True,
@@ -33,8 +34,8 @@ def list_apps(
     db: Session = Depends(get_session),
 ):
     try:
-        stmt = catalogue.apps_query(q=q, category=category, risk=risk, trust=trust, source=source,
-                                    oss_only=oss_only, funding_only=funding_only,
+        stmt = catalogue.apps_query(q=q, category=category, risk=risk, trust=trust, maintenance=maintenance,
+                                    source=source, oss_only=oss_only, funding_only=funding_only,
                                     ids=ids.split(",") if ids is not None else None)
     except catalogue.BadFilter as exc:
         raise HTTPException(422, str(exc))

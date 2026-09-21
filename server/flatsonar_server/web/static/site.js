@@ -100,7 +100,8 @@ document.addEventListener('keydown', function (e) {
 
   var form = root.querySelector('[data-catalogue-form]');
   var q = form.querySelector('#q'), whereSel = form.querySelector('#where'),
-      riskSel = form.querySelector('#risk'), trustSel = form.querySelector('#trust'), sortSel = form.querySelector('#sort');
+      riskSel = form.querySelector('#risk'), trustSel = form.querySelector('#trust'),
+      maintenanceSel = form.querySelector('#maintenance'), sortSel = form.querySelector('#sort');
   var grid = root.querySelector('.app-grid');
   var cards = grid ? Array.prototype.slice.call(grid.children) : [];
   var countEl = root.querySelector('[data-count]');
@@ -123,6 +124,7 @@ document.addEventListener('keydown', function (e) {
     whereSel.value = p.get('where') || '';
     riskSel.value = p.get('risk') || '';
     trustSel.value = p.get('trust') || '';
+    maintenanceSel.value = p.get('maintenance') || '';
     sortSel.value = p.get('sort') || 'name';
   }
 
@@ -134,6 +136,7 @@ document.addEventListener('keydown', function (e) {
     if (whereSel.value) p.set('where', whereSel.value);
     if (riskSel.value) p.set('risk', riskSel.value);
     if (trustSel.value) p.set('trust', trustSel.value);
+    if (maintenanceSel.value) p.set('maintenance', maintenanceSel.value);
     if (sortSel.value && sortSel.value !== 'name') p.set('sort', sortSel.value);
     var qs = p.toString();
     history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
@@ -155,6 +158,7 @@ document.addEventListener('keydown', function (e) {
     if (whereSel.value && card.dataset.where !== whereSel.value) return false;
     if (riskSel.value && card.dataset.risk !== riskSel.value) return false;
     if (trustSel.value && trustSel.value.split(',').indexOf(card.dataset.trust) === -1) return false;
+    if (maintenanceSel.value && maintenanceSel.value.split(',').indexOf(card.dataset.maintenance) === -1) return false;
     return true;
   }
 
@@ -230,7 +234,7 @@ document.addEventListener('keydown', function (e) {
   }
 
   q.addEventListener('input', debounce(onFilterChange, 200));
-  [whereSel, riskSel, trustSel, sortSel].forEach(function (el) { el.addEventListener('change', onFilterChange); });
+  [whereSel, riskSel, trustSel, maintenanceSel, sortSel].forEach(function (el) { el.addEventListener('change', onFilterChange); });
   form.addEventListener('submit', function (e) { e.preventDefault(); onFilterChange(); });
 
   catLinks.forEach(function (a) {
@@ -266,7 +270,7 @@ document.addEventListener('keydown', function (e) {
   var body = document.getElementById('results-body');
   if (!body) return;
 
-  var FIELDS = { q: '', where: '', risk: '', trust: '', sort: 'name' };
+  var FIELDS = { q: '', where: '', risk: '', trust: '', maintenance: '', sort: 'name' };
   var inflight = null;
 
   function urlFromForm() {

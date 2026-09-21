@@ -36,6 +36,10 @@
       <select id="trust" name="trust">
         {% for value, label in TRUST_FILTERS %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
       </select>
+      <label class="visually-hidden" for="maintenance">Maintenance</label>
+      <select id="maintenance" name="maintenance">
+        {% for value, label in MAINTENANCE_FILTERS %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
       <label class="visually-hidden" for="sort">Sort</label>
       <select id="sort" name="sort">
         {% for value, label in SORT_LABELS %}<option value="{{ value }}">{{ label }}</option>{% endfor %}

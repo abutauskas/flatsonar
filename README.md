@@ -123,6 +123,38 @@ and build commands such as `curl | sh`, `base64 -d`, setuid bits or
 `flatpak-spawn --host`. The API exposes all of this as `trust` and
 `trust_findings`; `/api/apps?trust=verified,reviewed` filters on it.
 
+## Is it still maintained?
+
+Flathub's curation implicitly vouches that a listing works: somebody submitted and
+built it recently enough to pass review. Flatsonar indexes straight from source
+control, so a listing might be a thriving project or a five-year-old fork nobody
+came back to, and nothing said which. `flatsonar_core.assess_maintenance` turns the
+repository signal the crawler already collected (archived flag, last push date)
+into one of three levels, exposed as `maintenance` and `maintenance_findings`:
+
+| Level | Meaning |
+|-------|---------|
+| **active** | Recent activity upstream, or on Flathub, where review and automatic updates are already a maintenance signal - every Flathub app is `active` here regardless of its own repository's pace. |
+| **stale** | No commits in a year or more. Might still work fine; nobody has had a reason to touch it. |
+| **abandoned** | The upstream repository is archived, or has had no commits in several years. |
+
+Like trust, this is a label, not a filter or a risk score: an abandoned app is
+never removed, hidden, or scored as dangerous, and `/api/apps?maintenance=stale,abandoned`
+only narrows what a search *shows*. A five-year-old utility that never needed
+another commit is not a security problem, so this never feeds the sandbox-risk
+score or the two-gate install warning below - it is a note about the people
+behind an app, not the permissions it asks for.
+
+A separate, narrower signal tracks the build itself: `App.manifest_ok` records
+whether the crawler's *most recent* visit could still parse the manifest that got
+an app listed in the first place. A YAML typo, a renamed file, a source moved out
+from under it - none of that deletes the listing (the last good data keeps
+serving), but the app page says plainly that the build may be broken, with the
+parse error attached, rather than silently showing stale information as if it
+were current. Applying it is guarded the same way id collisions are: it only ever
+marks an *already-indexed* app from the *same* repository, so an unrelated file
+that happens to share a filename can never mark someone else's app broken.
+
 ## How the warning works
 
 The install flow has two gates, because two different things can be wrong.
@@ -233,6 +265,19 @@ catalogue" section and the Atom feed meaningful between runs.
   `<url type="donation">` give the sponsor buttons, release assets ending in `.flatpak`
   become one-click bundle installs, `.flatpakrepo` files become remotes, and anything
   with only a manifest gets built locally with `flatpak-builder`.
+- **Independent Flatpak remotes** (`--source remotes`) - distros, projects and
+  organisations that publish their own browsable catalogue instead of building
+  through Flathub (GNOME's nightly builds, elementary's AppCenter, ...) never had a
+  manifest sitting in a repo for the crawler above to find. `settings.third_party_remotes`
+  is a seed list of their `.flatpakrepo` URLs - there is no search API for "find
+  Flatpak remotes on the internet", so unlike everything else here, these have to be
+  known in advance. For each, `flatsonar_core.ostree_summary` reads `<url>/summary`
+  (the ref list every OSTree remote serves over plain HTTP, no client or auth needed)
+  and cross-references it against `<url>/appstream/<arch>/appstream.xml.gz` when the
+  remote exports one; only an app in both, with an open-source license, gets listed -
+  a remote's ref list alone carries no license information. A remote that doesn't
+  export that appstream file is enumerated but not yet listed from (reading it needs
+  walking OSTree's commit/tree/file objects directly, which isn't implemented).
 
 **Opting out.** Tag a repository with the topic `noflatsonar` (or `no-flatsonar`) on
 GitHub, GitLab or Codeberg and the crawler skips it entirely - it never reads the
@@ -249,6 +294,12 @@ GitLab hunting is not limited to gitlab.com: `settings.gitlab_instances` (env
 gitlab.freedesktop.org and gitlab.xfce.org by default, since that is where a
 meaningful share of desktop Linux software actually lives. Self-hosted instances
 never show up in a gitlab.com-only search.
+
+**No SourceHut.** Also not an oversight: sr.ht's GraphQL API is lookup-by-known-name
+only - there is no site-wide search or repo-listing endpoint, by explicit minimalist
+design, so there is nothing to "hunt" against. (SourceHut repos still turn up
+indirectly and get properly credited when a manifest found elsewhere - on GitHub,
+GitLab, or Codeberg - points its `sources` at one; that's unrelated and unaffected.)
 
 **No Bitbucket.** Not an oversight: Bitbucket Cloud removed cross-workspace
 repository search entirely on April 14, 2026, and its one remaining

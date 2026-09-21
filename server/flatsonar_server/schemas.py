@@ -56,6 +56,8 @@ class AppSummary(BaseModel):
     flathub_verified: bool
     archived: bool = False  # the upstream repo is archived; the app may still work fine
     trust: str  # verified | reviewed | unverified | suspicious
+    maintenance: str = "active"  # active | stale | abandoned
+    manifest_ok: bool = True  # False: the crawler's last visit could no longer parse this app's manifest
     stars: int
     latest_version: str | None = None
     has_funding: bool = False
@@ -70,6 +72,8 @@ class AppDetail(AppSummary):
     risk_reasons: list[str]
     permissions: list[Permission]
     trust_findings: list[TrustFinding]
+    maintenance_findings: list[TrustFinding]
+    manifest_error: str | None = None
     forks: int
     repo_created_at: datetime | None
     repo_pushed_at: datetime | None
@@ -98,4 +102,5 @@ class Stats(BaseModel):
     with_funding: int
     by_risk: dict[str, int]
     by_trust: dict[str, int]
+    by_maintenance: dict[str, int]
     last_crawls: list[dict]

@@ -34,6 +34,7 @@ class AppInfo:
     on_flathub: bool = False
     flathub_verified: bool = False
     trust: str = "unverified"  # verified | reviewed | unverified | suspicious
+    maintenance: str = "active"  # active | stale | abandoned
     stars: int = 0
     has_funding: bool = False
     # detail-only
@@ -45,6 +46,7 @@ class AppInfo:
     risk_reasons: list[str] = field(default_factory=list)
     permissions: list[dict[str, str]] = field(default_factory=list)
     trust_findings: list[dict[str, str]] = field(default_factory=list)  # [{check, level, reason}]
+    maintenance_findings: list[dict[str, str]] = field(default_factory=list)  # [{check, level, reason}]
     forks: int = 0
     repo_created_at: str | None = None
     repo_pushed_at: str | None = None
@@ -88,8 +90,8 @@ class FlatsonarAPI:
         self._client = httpx.Client(base_url=self.base, timeout=75.0, headers={"User-Agent": "Flatsonar-client/0.1"})
 
     def list_apps(self, q: str | None = None, category: str | None = None, risk: str | None = None,
-                  trust: str | None = None, sort: str = "name", page: int = 1, per_page: int = 48,
-                  funding_only: bool = False, ids: list[str] | None = None) -> Page:
+                  trust: str | None = None, maintenance: str | None = None, sort: str = "name", page: int = 1,
+                  per_page: int = 48, funding_only: bool = False, ids: list[str] | None = None) -> Page:
         params: dict[str, Any] = {"page": page, "per_page": per_page, "sort": sort}
         if ids is not None:
             params["ids"] = ",".join(ids)
@@ -101,6 +103,8 @@ class FlatsonarAPI:
             params["risk"] = risk
         if trust:
             params["trust"] = trust
+        if maintenance:
+            params["maintenance"] = maintenance
         if funding_only:
             params["funding_only"] = "true"
         r = self._client.get("/api/apps", params=params)

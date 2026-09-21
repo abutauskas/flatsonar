@@ -74,6 +74,29 @@ def parse_metainfo(text: str) -> MetaInfo | None:
         return None
     if root.tag not in ("component", "application"):
         return None
+    return _parse_component(root)
+
+
+def parse_collection(text: str) -> dict[str, MetaInfo]:
+    """A ``<components>`` catalogue - the format a Flatpak remote publishes for its
+    whole app list (as opposed to the single-``<component>`` ``*.metainfo.xml`` a
+    project commits to its own repository, which :func:`parse_metainfo` reads).
+    Every entry with a usable id, keyed by that id."""
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return {}
+    if root.tag != "components":
+        return {}
+    out: dict[str, MetaInfo] = {}
+    for component in root.findall("component"):
+        info = _parse_component(component)
+        if info and info.app_id:
+            out[info.app_id] = info
+    return out
+
+
+def _parse_component(root: ET.Element) -> MetaInfo | None:
     info = MetaInfo()
     info.app_id = (_untranslated(root, "id") or "").removesuffix(".desktop") or None
     info.name = _untranslated(root, "name")

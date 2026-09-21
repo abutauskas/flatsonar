@@ -47,11 +47,17 @@ class GitLabForge:
         )
 
     async def list_repos(self, ctx: CrawlContext, limit: int | None) -> AsyncIterator[RepoInfo]:
+        # Each search gets its own budget rather than sharing one pool: "search=flatpak"
+        # (name or description mentions it) finds far more than "topic=flatpak" (an
+        # opt-in tag most projects never add), so if the topic search ran first and
+        # alone reached the shared budget, the broader query - the one actually built to
+        # catch what the topic misses - would never run at all.
         budget = limit or 1000
         seen: set[str] = set()
         for search in SEARCHES:
+            found = 0
             page = 1
-            while len(seen) < budget:
+            while found < budget:
                 url = (f"{self.api}/projects?{search}&order_by=star_count&sort=desc&simple=false"
                        f"&archived=false&visibility=public&per_page=100&page={page}")
                 data = await ctx.fetch_json(url, self._headers())
@@ -68,9 +74,10 @@ class GitLabForge:
                     if p.get("visibility") != "public":
                         continue
                     yield self._repo_info(p)
-                    if len(seen) >= budget:
-                        return
-                if len(data) < 100:
+                    found += 1
+                    if found >= budget:
+                        break
+                if found >= budget or len(data) < 100:
                     break
                 page += 1
 

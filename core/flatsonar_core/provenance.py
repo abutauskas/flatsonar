@@ -237,6 +237,18 @@ def check_ownership(app_id: str, hosted_at: str | None, builds_from: list[str] |
     if ok:
         return OwnershipResult(Ownership.VERIFIED, f"hosted by {where}, which owns the {ns} namespace of {app_id}",
                                namespace=ns, expected_owner=user, builds_from=builds)
+    if ref is None:
+        # A namespace was claimed, but there is no hosting location to check it
+        # against at all (e.g. an app known only from a third-party remote's
+        # catalogue, not from crawling its repository). That is unproven, not
+        # contradicted - impersonation requires knowing the real hosting and
+        # having it disagree with the claim, not merely lacking the claim's proof.
+        owner_text = f"{ns}.{user}" if user else ns
+        return OwnershipResult(
+            Ownership.UNKNOWN,
+            f"{app_id} claims the {owner_text} namespace, but no hosting location is known to check it against",
+            namespace=ns, expected_owner=user, builds_from=builds,
+        )
 
     # Not the owner. Does it at least build the owner's code?
     for src in builds:

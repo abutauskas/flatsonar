@@ -55,6 +55,12 @@ TRUST_TIP = {
     "suspicious": "Something concrete is wrong: the id claims a namespace this repository does not own, or the "
                   "build does things a build should not. Flatsonar warns twice.",
 }
+MAINTENANCE_TEXT = {"active": "Actively maintained", "stale": "Quiet for a while", "abandoned": "Looks abandoned"}
+MAINTENANCE_TIP = {
+    "active": "Recent activity on the upstream repository, or built and reviewed by Flathub.",
+    "stale": "No commits in a year or more. Might still work fine; nobody has touched it in a while.",
+    "abandoned": "The upstream repository is archived, or has had no commits in several years.",
+}
 FUNDING_LABEL = {
     "github": "GitHub Sponsors", "patreon": "Patreon", "ko_fi": "Ko-fi", "liberapay": "Liberapay",
     "open_collective": "Open Collective", "buy_me_a_coffee": "Buy Me a Coffee", "custom": "Donate",
@@ -63,6 +69,7 @@ SORT_LABELS = [("name", "Name"), ("stars", "Most starred"), ("updated", "Recentl
 RISK_FILTERS = [("", "Any risk"), ("green", "Sandboxed only"), ("yellow", "Broad permissions"), ("red", "Dangerous")]
 TRUST_FILTERS = [("", "Any publisher"), ("verified", "Verified creators"), ("verified,reviewed", "Verified or Flathub"),
                  ("unverified,suspicious", "Unverified only")]
+MAINTENANCE_FILTERS = [("", "Any maintenance"), ("active", "Actively maintained"), ("stale,abandoned", "Quiet or abandoned")]
 WHERE_FILTERS = [("", "Anywhere"), ("flathub", "On Flathub"), ("hunted", "Outside Flathub")]
 PER_PAGE = 36
 
@@ -151,7 +158,9 @@ templates.env.filters["nicedate"] = _nicedate
 templates.env.filters["browsable_categories"] = catalogue.browsable_categories
 templates.env.globals.update(
     site=SITE, RISK_TEXT=RISK_TEXT, RISK_TIP=RISK_TIP, TRUST_TEXT=TRUST_TEXT, TRUST_TIP=TRUST_TIP,
-    SORT_LABELS=SORT_LABELS, RISK_FILTERS=RISK_FILTERS, TRUST_FILTERS=TRUST_FILTERS, WHERE_FILTERS=WHERE_FILTERS,
+    MAINTENANCE_TEXT=MAINTENANCE_TEXT, MAINTENANCE_TIP=MAINTENANCE_TIP,
+    SORT_LABELS=SORT_LABELS, RISK_FILTERS=RISK_FILTERS, TRUST_FILTERS=TRUST_FILTERS,
+    MAINTENANCE_FILTERS=MAINTENANCE_FILTERS, WHERE_FILTERS=WHERE_FILTERS,
     query_url=query_url, base_url=base_url,
     STATIC_BUILD=False,  # flipped to True for the duration of a GitHub Pages build; see web.build
 )
@@ -181,6 +190,7 @@ def apps(
     category: str | None = None,
     risk: str | None = Query(None, pattern="^(green|yellow|red|)$"),
     trust: str | None = None,
+    maintenance: str | None = None,
     where: str | None = Query(None, pattern="^(flathub|hunted|)$"),
     sort: str = Query("name", pattern="^(name|stars|updated|newest)$"),
     page: int = Query(1, ge=1),
@@ -189,15 +199,15 @@ def apps(
     on_flathub = {"flathub": True, "hunted": False}.get(where or "")
     try:
         stmt = catalogue.apps_query(q=q, category=category, risk=risk or None, trust=trust or None,
-                                    on_flathub=on_flathub)
+                                    maintenance=maintenance or None, on_flathub=on_flathub)
     except catalogue.BadFilter:
-        trust = None
+        trust = maintenance = None
         stmt = catalogue.apps_query(q=q, category=category, risk=risk or None, on_flathub=on_flathub)
     rows, total = catalogue.page_apps(db, stmt, sort, page, PER_PAGE, q=q)
     pages = max(1, -(-total // PER_PAGE))
     return render(request, "apps.html", apps=rows, total=total, page=page, pages=pages, q=q or "",
-                  category=category or "", risk=risk or "", trust=trust or "", where=where or "", sort=sort,
-                  categories=catalogue.category_counts(db))
+                  category=category or "", risk=risk or "", trust=trust or "", maintenance=maintenance or "",
+                  where=where or "", sort=sort, categories=catalogue.category_counts(db))
 
 
 @router.get("/apps/{app_id}", response_class=HTMLResponse)

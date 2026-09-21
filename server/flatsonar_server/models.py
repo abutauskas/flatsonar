@@ -63,6 +63,20 @@ class App(Base):
     trust: Mapped[str] = mapped_column(String(12), default="unverified", index=True)
     trust_findings: Mapped[list[dict]] = mapped_column(JSON, default=list)  # [{check, level, reason}]
 
+    # Is anyone still tending this (see flatsonar_core.maintenance): active / stale / abandoned.
+    # Flathub's review process is itself a maintenance signal, so on_flathub apps are always
+    # "active" here; this exists for the apps Flatsonar indexes straight from a repository,
+    # where nothing else says whether the listing is a live project or a five-year-old fork.
+    maintenance: Mapped[str] = mapped_column(String(12), default="active", index=True)
+    maintenance_findings: Mapped[list[dict]] = mapped_column(JSON, default=list)  # [{check, level, reason}]
+
+    # Did the crawler's last visit to this app's repository still parse its manifest?
+    # False means the app's own listing is stale: it was building fine at some point
+    # (that's how it got listed) but the repository has since changed in a way that
+    # broke it - a YAML typo, a renamed file, a source moved out from under it.
+    manifest_ok: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    manifest_error: Mapped[str | None] = mapped_column(String(512))
+
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

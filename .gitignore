@@ -29,6 +29,7 @@ public/
 build-dir/
 repo/
 *.flatpak
+.claude
 
 # wrangler (Cloudflare Pages CLI)
 .wrangler/

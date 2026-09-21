@@ -11,7 +11,7 @@ from sqlalchemy import String, case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql import Select
 
-from flatsonar_core import TrustLevel
+from flatsonar_core import MaintenanceLevel, TrustLevel
 
 from .models import App, CrawlRun, InstallSource, SourceKind
 
@@ -22,10 +22,11 @@ SORTS = {
     "newest": App.first_seen.desc(),
 }
 TRUSTS = tuple(level.label for level in TrustLevel)
+MAINTENANCE_LEVELS = tuple(level.label for level in MaintenanceLevel)
 
 
 class BadFilter(ValueError):
-    """A filter value the catalogue does not know (an unknown trust level)."""
+    """A filter value the catalogue does not know (an unknown trust or maintenance level)."""
 
 
 def _relevance(q: str):
@@ -57,11 +58,23 @@ def parse_trust(trust: str | None) -> list[str]:
     return levels
 
 
+def parse_maintenance(maintenance: str | None) -> list[str]:
+    """``"stale,abandoned"`` -> ``["stale", "abandoned"]``; raises :class:`BadFilter`."""
+    if not maintenance:
+        return []
+    levels = [m.strip().lower() for m in maintenance.split(",") if m.strip()]
+    unknown = [m for m in levels if m not in MAINTENANCE_LEVELS]
+    if unknown:
+        raise BadFilter(f"unknown maintenance level(s): {', '.join(unknown)}")
+    return levels
+
+
 def apps_query(
     q: str | None = None,
     category: str | None = None,
     risk: str | None = None,
     trust: str | None = None,
+    maintenance: str | None = None,
     source: SourceKind | None = None,
     oss_only: bool = True,
     funding_only: bool = False,
@@ -90,6 +103,9 @@ def apps_query(
     levels = parse_trust(trust)
     if levels:
         stmt = stmt.where(App.trust.in_(levels))
+    maint_levels = parse_maintenance(maintenance)
+    if maint_levels:
+        stmt = stmt.where(App.maintenance.in_(maint_levels))
     if source:
         stmt = stmt.where(App.app_id.in_(select(InstallSource.app_id).where(InstallSource.kind == source)))
     if funding_only:
@@ -197,6 +213,8 @@ def catalogue_stats(db: Session) -> dict[str, Any]:
                db.execute(select(oss.c.risk_level, func.count()).group_by(oss.c.risk_level)).all()}
     by_trust = {level: count for level, count in
                 db.execute(select(oss.c.trust, func.count()).group_by(oss.c.trust)).all()}
+    by_maintenance = {level: count for level, count in
+                      db.execute(select(oss.c.maintenance, func.count()).group_by(oss.c.maintenance)).all()}
     runs = db.scalars(select(CrawlRun).order_by(CrawlRun.started_at.desc()).limit(10)).all()
     return {
         "apps": total,
@@ -205,6 +223,7 @@ def catalogue_stats(db: Session) -> dict[str, Any]:
         "with_funding": with_funding,
         "by_risk": by_risk,
         "by_trust": by_trust,
+        "by_maintenance": by_maintenance,
         "last_crawls": [
             {
                 "source": r.source,

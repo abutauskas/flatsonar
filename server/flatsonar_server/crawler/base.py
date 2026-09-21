@@ -20,7 +20,7 @@ import httpx
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from flatsonar_core import Finding, Manifest, RiskLevel, TrustLevel, is_open_source, score_finish_args
+from flatsonar_core import Finding, MaintenanceLevel, Manifest, RiskLevel, TrustLevel, is_open_source, score_finish_args
 from flatsonar_core.provenance import same_repo
 
 from ..models import App, InstallSource, ManifestRecord, SourceKind
@@ -142,7 +142,12 @@ class CrawlContext:
             if resp is None:
                 await asyncio.sleep(1.5 * (attempt + 1))
                 continue
-            if resp.status_code in (403, 429) and "rate limit" in resp.text.lower():
+            # 429 is unambiguous by definition - Too Many Requests - so it's always worth
+            # a backoff, whatever the body says (GitLab and Gitea/Codeberg don't echo GitHub's
+            # "rate limit" wording, and the self-hosted GitLab instances we hunt unauthenticated
+            # - gitlab.gnome.org, invent.kde.org, ... - are exactly the ones likely to hit this).
+            # 403 is ambiguous (also plain "forbidden"), so keep sniffing the body for that one.
+            if resp.status_code == 429 or (resp.status_code == 403 and "rate limit" in resp.text.lower()):
                 reset = resp.headers.get("x-ratelimit-reset") or resp.headers.get("retry-after")
                 delay = 60.0
                 if reset:
@@ -170,6 +175,33 @@ class CrawlContext:
             return r.json()
         except json.JSONDecodeError:
             return None
+
+    async def fetch_bytes(self, url: str) -> bytes | None:
+        """Like :meth:`fetch`, but for binary content (an OSTree summary GVariant, a
+        gzip archive) that must never go through ``.text``'s encoding guess or the
+        on-disk cache, which both assume a string body. Simpler retry than
+        :meth:`fetch` - this is called a handful of times per crawl (once per
+        third-party remote), not once per repo, so it doesn't need the same
+        rate-limit sophistication."""
+        host = urlsplit(url).hostname or ""
+        for attempt in range(3):
+            async with self.limiter.sem:
+                await self.limiter.wait(host)
+                try:
+                    resp = await self.client.get(url)
+                except httpx.HTTPError as exc:
+                    if attempt == 2:
+                        log.warning("GET %s failed: %s", url, exc)
+                        return None
+                    resp = None
+            if resp is None:
+                await asyncio.sleep(1.5 * (attempt + 1))
+                continue
+            if resp.status_code == 429:
+                await asyncio.sleep(60.0)
+                continue
+            break
+        return resp.content if resp.status_code == 200 else None
 
 
 T = TypeVar("T")
@@ -242,6 +274,12 @@ class Candidate:
     # Filled by crawler.trust.assess(); None means "not assessed" and the row keeps what it had.
     trust: TrustLevel | None = None
     trust_findings: list[Finding] = field(default_factory=list)
+    maintenance: MaintenanceLevel | None = None
+    maintenance_findings: list[Finding] = field(default_factory=list)
+    # Set only by forge.candidates_from_repo when a manifest that used to parse no
+    # longer does. None means "not attempted" or "no change"; upsert_candidate applies
+    # it only to a matching existing row, never to create a new one.
+    manifest_error: str | None = None
 
     @property
     def trust_level(self) -> TrustLevel:
@@ -331,6 +369,17 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
         if cand.upstream_url:
             db.execute(delete(App).where(App.upstream_url == cand.upstream_url))
         return None, False
+    if cand.manifest_error is not None:
+        # A manifest that used to parse no longer does. Only worth recording against
+        # an app that was already indexed from that same repository - a stub for one
+        # that was never indexed would be an empty row with nothing to show, and a
+        # same-named file in an unrelated repository must not mark a real app broken.
+        app = db.get(App, cand.app_id)
+        if app is None or not same_repo(app.upstream_url, cand.upstream_url):
+            return None, False
+        app.manifest_ok = False
+        app.manifest_error = cand.manifest_error[:500]
+        return app, False
     app = db.get(App, cand.app_id)
     created = app is None
     if created:
@@ -378,6 +427,10 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
         app.trust = cand.trust.label
         app.trust_findings = [*kept, *(_finding_dict(f) for f in findings)]
 
+    if cand.maintenance is not None:
+        app.maintenance = cand.maintenance.label
+        app.maintenance_findings = [_finding_dict(f) for f in cand.maintenance_findings]
+
     if cand.funding_links:
         merged = {(l["platform"], l["url"]): l for l in (app.funding_links or [])}
         for l in cand.funding_links:
@@ -391,6 +444,8 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
 
     if cand.manifest is not None:
         m = cand.manifest
+        app.manifest_ok = True
+        app.manifest_error = None
         report = score_finish_args(m.finish_args, m.app_id)
         app.risk_level = report.level.label
         app.risk_reasons = report.reasons

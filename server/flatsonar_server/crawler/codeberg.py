@@ -1,4 +1,5 @@
-"""Codeberg hunter (Gitea/Forgejo API). Also usable for any Forgejo instance."""
+"""Codeberg hunter (Gitea/Forgejo API); walks codeberg.org by default and any other
+Gitea/Forgejo instance via ``codeberg_instances``."""
 
 from __future__ import annotations
 
@@ -46,11 +47,15 @@ class GiteaForge:
         )
 
     async def list_repos(self, ctx: CrawlContext, limit: int | None) -> AsyncIterator[RepoInfo]:
+        # Each search gets its own budget - see GitHub/GitLab list_repos for why sharing
+        # one pool between an opt-in topic and a plain keyword search would starve the
+        # broader, higher-recall query if the narrower one happened to run first.
         budget = limit or 1000
         seen: set[str] = set()
         for q, topic in (("flatpak", "true"), ("flatpak", "false")):
+            found = 0
             page = 1
-            while len(seen) < budget:
+            while found < budget:
                 url = (f"{self.api}/repos/search?q={q}&topic={topic}&sort=stars&order=desc"
                        f"&private=false&limit=50&page={page}")
                 data = await ctx.fetch_json(url, self._headers())
@@ -66,9 +71,10 @@ class GiteaForge:
                     if r.get("private"):
                         continue
                     yield self._repo_info(r)
-                    if len(seen) >= budget:
-                        return
-                if len(items) < 50:
+                    found += 1
+                    if found >= budget:
+                        break
+                if found >= budget or len(items) < 50:
                     break
                 page += 1
 
@@ -94,22 +100,23 @@ class GiteaForge:
 class CodebergSource:
     name = "codeberg"
 
-    def __init__(self, token: str | None = None):
-        self.forge = GiteaForge(token=token)
+    def __init__(self, token: str | None = None, base_urls: tuple[str, ...] = ("https://codeberg.org",)):
+        self.forges = [GiteaForge(u, token if "codeberg.org" in u else None) for u in base_urls]
 
     async def discover(self, ctx: CrawlContext, limit: int | None = None) -> AsyncIterator[Candidate]:
-        repos = [r async for r in self.forge.list_repos(ctx, limit)]
-
-        async def worker(repo: RepoInfo) -> list[Candidate]:
-            try:
-                return await candidates_from_repo(ctx, self.forge, repo)
-            except Exception as exc:
-                log.warning("codeberg %s: %s", repo.full_name, exc)
-                return []
-
         n = 0
-        async for cands in fan_out(repos, worker, ctx.concurrency):
-            for cand in cands:
-                yield cand
-                n += 1
+        for forge in self.forges:
+            repos = [r async for r in forge.list_repos(ctx, limit)]
+
+            async def worker(repo: RepoInfo, forge=forge) -> list[Candidate]:
+                try:
+                    return await candidates_from_repo(ctx, forge, repo)
+                except Exception as exc:
+                    log.warning("codeberg %s: %s", repo.full_name, exc)
+                    return []
+
+            async for cands in fan_out(repos, worker, ctx.concurrency):
+                for cand in cands:
+                    yield cand
+                    n += 1
         log.info("codeberg: %d candidates", n)

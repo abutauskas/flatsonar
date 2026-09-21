@@ -146,7 +146,11 @@ async def _funding_links(ctx: CrawlContext, forge: Forge, repo: RepoInfo) -> lis
     return []
 
 
-def _parse_flatpakrepo(text: str) -> tuple[str | None, str | None]:
+def parse_flatpakrepo(text: str) -> tuple[str | None, str | None]:
+    """A ``.flatpakrepo`` file's ``Title=``/``Url=`` fields - the ``Url=`` is the
+    OSTree repo base to fetch ``/summary`` from; the file's own URL (not this) is
+    what goes in ``flatpak remote-add``, since that command reads a ``.flatpakrepo``
+    URL directly and imports its Title/Url/GPGKey itself."""
     title = url = None
     for line in text.splitlines():
         k, _, v = line.partition("=")
@@ -186,6 +190,14 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
             manifest: Manifest = parse_manifest_text(text, posixpath.basename(path))
         except ManifestError as exc:
             log.debug("%s:%s not a manifest: %s", repo.full_name, path, exc)
+            # The filename alone (by convention, the app id) is enough to flag an
+            # *already-listed* app whose manifest used to parse and no longer does -
+            # upsert_candidate only ever applies this to a matching existing row from
+            # the same repository, so an unrelated file that merely looks like a
+            # manifest id can't wrongly mark a real app's build broken.
+            filename_id = re.sub(r"\.(Devel|Nightly|Daily)$", "", posixpath.basename(path).rsplit(".", 1)[0])
+            out.append(Candidate(app_id=filename_id, upstream_url=upstream.url if upstream else repo.html_url,
+                                 manifest_error=f"manifest no longer parses: {exc}"))
             continue
         app_id = manifest.app_id
         base_id = re.sub(r"\.(Devel|Nightly|Daily)$", "", app_id)
@@ -215,7 +227,7 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
         if fr:
             fr_text = await _read(ctx, forge, repo, fr)
             if fr_text:
-                title, url = _parse_flatpakrepo(fr_text)
+                title, url = parse_flatpakrepo(fr_text)
                 if url:
                     sources.append(SourceSpec(
                         kind=SourceKind.REMOTE,

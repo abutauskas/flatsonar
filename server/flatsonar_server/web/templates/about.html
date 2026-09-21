@@ -12,6 +12,7 @@
   <nav class="toc" aria-label="On this page">
     <a href="#hunt">The hunt</a>
     <a href="#trust">Who publishes this?</a>
+    <a href="#maintenance">Is it still maintained?</a>
     <a href="#warning">How the warning works</a>
     <a href="#get">Get the app</a>
     <a href="#developers">For developers</a>
@@ -25,6 +26,7 @@
       <ul>
         <li><strong>Flathub</strong>: API v2 for metadata and the <em>deployed</em> permissions, plus the <code>github.com/flathub/&lt;id&gt;</code> manifest for <code>sources</code>, which is where the upstream repository and creator credit come from.</li>
         <li><strong>GitHub, GitLab, Codeberg</strong>: repositories tagged <code>flatpak</code> (and code search, with a token) whose tree contains a <code>reverse.dns.Name.{json,yml,yaml}</code> manifest. The <code>.metainfo.xml</code> gives the name, summary, license and screenshots; <code>FUNDING.yml</code> and AppStream <code>&lt;url type="donation"&gt;</code> give the Sponsor buttons.</li>
+        <li><strong>Independent Flatpak remotes</strong>: distros and projects that publish their own browsable catalogue instead of building through Flathub - GNOME's nightly builds, elementary's AppCenter, and a short list of others - never had a manifest sitting in a repository for the crawl above to find. These are hunted by reading what every such remote already serves over plain HTTP: its ref list and, where it exports one, its app metadata. Only an app with a confirmed open-source license gets listed this way.</li>
       </ul>
       <p>Release assets ending in <code>.flatpak</code> become one-click bundle installs, <code>.flatpakrepo</code> files become remotes, and anything that only has a manifest is built locally with <code>flatpak-builder</code>.</p>
       <p>Only OSI/FSF-approved SPDX licenses are listed. Proprietary apps on Flathub are skipped. Verification is never a filter: unverified publishers are indexed like everyone else and labelled honestly.</p>
@@ -43,6 +45,18 @@
       <p>Yellow notes never downgrade an app on their own (a repository that is three days old with no stars, a name shared with a Flathub app, an id someone else also publishes), but they are listed before installing.</p>
       <p>One app id, one publisher. Flathub always keeps its row, and a repository claiming a Flathub app's id may only enrich it when it <em>is</em> the repository Flathub builds from, so nobody can plant a sponsor button on someone else's app. Between two off-Flathub publishers the first one seen keeps the id unless the newcomer is strictly more trusted: the real owner turning up after a copy.</p>
       <p>Before anything is built, the manifest itself is audited: <code>extra-data</code> downloaded at install time after any scan, sources over plain <code>http://</code>, archives without a checksum, git sources tracking a branch, prebuilt binaries instead of source, build arguments that open the build sandbox, and build commands such as <code>curl | sh</code>, <code>base64 -d</code>, setuid bits or <code>flatpak-spawn --host</code>.</p>
+    </section>
+
+    <section id="maintenance">
+      <h2>Is it still maintained?</h2>
+      <p>A store that curates submissions gets to imply an app works just by listing it. {{ site.name }} indexes straight from source control instead, so a listing might be a thriving project or a fork nobody came back to, and nothing said which. Every off-Flathub app gets a maintenance signal from the same repository data the hunt already collected:</p>
+      <table class="levels">
+        <tr><th class="active">Active</th><td>Recent activity on the upstream repository - or on Flathub, where review and automatic updates are already a maintenance signal, so every Flathub app is active here regardless of its own repository's pace.</td></tr>
+        <tr><th class="stale">Stale</th><td>No commits in a year or more. It might still work perfectly; nobody has had a reason to touch it in a while.</td></tr>
+        <tr><th class="abandoned">Abandoned</th><td>The upstream repository has been archived by its owner, or has had no commits in several years.</td></tr>
+      </table>
+      <p>Like trust, this is a label, not a filter: an abandoned app is not removed or hidden, and the catalogue can be searched, sorted or filtered by it either way. A five-year-old utility that simply never needed another commit is not the same as an actively dangerous build, so this never feeds into the sandbox-risk score or the install warnings below - it says something about the people, not the permissions.</p>
+      <p>A separate, narrower check tracks the build itself: if the crawler's most recent visit could no longer parse the manifest that got an app listed, the page says so plainly - "Build may be broken", with the parse error attached - rather than quietly going on showing stale information as if it were current.</p>
     </section>
 
     <section id="warning">
@@ -83,12 +97,14 @@ FLATSONAR_API={{ base_url(request) }} python -m flatsonar</code><button class="c
         <li>Pin your sources (<code>sha256</code> for archives, <code>commit</code> for git), keep <code>finish-args</code> tight, and the badges take care of themselves.</li>
       </ul>
       <p>Don't want your project here at all? Add the topic <code>noflatsonar</code> (or <code>no-flatsonar</code>) to the repository and the next crawl removes it, without reading anything further.</p>
+      <p>Once listed, every app page has a copyable "Get it on {{ site.name }}" badge for your README, next to the manifest link.</p>
+      <p>Ship your own Flatpak remote instead of a repository manifest? There's no submission form for that (see "The hunt" above: {{ site.name }} indexes remotes from a maintained seed list, not an open queue), but <a href="{{ site.issues }}" rel="noopener">opening an issue</a> with the remote's <code>.flatpakrepo</code> URL is the way to ask for it to be added.</p>
       <p>Something wrong with a listing: credit, license, an impostor? <a href="{{ site.issues }}" rel="noopener">Open an issue</a>.</p>
     </section>
 
     <section id="api">
       <h2>API</h2>
-      <p>Everything on this site is available as JSON at <a href="/docs"><code>/api</code></a>: <code>/api/apps?q=&amp;category=&amp;risk=&amp;trust=&amp;sort=</code>, <code>/api/apps/{id}</code>, <code>/api/apps/{id}/manifest</code>, <code>/api/categories</code> and <code>/api/stats</code>. New apps are also published as an <a href="/feed.xml">Atom feed</a>.</p>
+      <p>Everything on this site is available as JSON at <a href="/docs"><code>/api</code></a>: <code>/api/apps?q=&amp;category=&amp;risk=&amp;trust=&amp;maintenance=&amp;sort=</code>, <code>/api/apps/{id}</code>, <code>/api/apps/{id}/manifest</code>, <code>/api/categories</code> and <code>/api/stats</code>. New apps are also published as an <a href="/feed.xml">Atom feed</a>.</p>
       <p>{{ site.name }} is free software under the GPL-3.0-or-later. Every app listed belongs to its own authors under its own license. {{ site.name }} just points at them. <a href="{{ site.repo }}" rel="noopener">Source on GitHub</a>.</p>
     </section>
   </div>
