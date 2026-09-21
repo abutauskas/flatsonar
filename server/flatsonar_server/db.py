@@ -20,6 +20,18 @@ def make_engine(url: str | None = None):
         kwargs["connect_args"] = {"check_same_thread": False}
         if url in ("sqlite://", "sqlite:///:memory:"):
             kwargs["poolclass"] = StaticPool  # one shared connection, or every thread sees an empty DB
+    elif url.startswith("postgresql"):
+        # A transaction-mode pooler (Supabase's Supavisor on :6543, PgBouncer in the
+        # same mode elsewhere) can hand a different backend connection to each
+        # transaction. psycopg3's default automatic server-side PREPARE (after a
+        # statement repeats a few times) then collides with or vanishes from
+        # whatever backend the pooler happens to route to next -
+        # DuplicatePreparedStatement / InvalidSqlStatementName / ProtocolViolation,
+        # and once one of those corrupts a connection mid-session, unrelated-looking
+        # errors follow as knock-on damage. Disabling server-side prepare is
+        # Supabase's own documented fix for exactly this pooler mode, and is safe
+        # (if slightly less efficient) against a session-mode pooler too.
+        kwargs["connect_args"] = {"prepare_threshold": None}
     engine = create_engine(url, future=True, **kwargs)
     if url.startswith("sqlite"):
 

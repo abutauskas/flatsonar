@@ -42,14 +42,40 @@ class MetaInfo:
     screenshots: list[str] = field(default_factory=list)
     categories: list[str] = field(default_factory=list)
     latest_version: str | None = None
+    # "<width>x<height>/<filename>", relative to a Flatpak remote's own
+    # appstream/<arch>/icons/ convention (only meaningful for parse_collection's
+    # caller, remotes.py, which knows that base path; parse_metainfo callers -
+    # a manifest's own committed metainfo.xml - get their icon from the
+    # repository's file tree instead, via forge.find_icon).
+    icon: str | None = None
+
+
+_XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
+
+
+def _untranslated_element(root: ET.Element, tag: str) -> ET.Element | None:
+    """First <tag> sibling without an xml:lang attribute (the source language).
+    AppStream has two different ways of shipping translations: several sibling
+    <tag xml:lang="X"> elements (what this picks between), or one <tag> whose own
+    children carry the xml:lang attributes instead (what a plain root.find(tag)
+    already gets right, since translated children are filtered out separately -
+    see _description_text). A collection catalogue - the multi-app file a Flatpak
+    remote publishes, read by parse_collection - uses the sibling-elements form;
+    picking the first one blind (as root.find(tag) does) grabs whatever language
+    happens to sort first, not the source text."""
+    els = root.findall(tag)
+    for el in els:
+        if _XML_LANG not in el.attrib:
+            return el
+    return els[0] if els else None
 
 
 def _untranslated(root: ET.Element, tag: str) -> str | None:
     """First <tag> without an xml:lang attribute (the source language)."""
-    for el in root.findall(tag):
-        if "{http://www.w3.org/XML/1998/namespace}lang" not in el.attrib:
-            return (el.text or "").strip() or None
-    return None
+    el = _untranslated_element(root, tag)
+    if el is None or _XML_LANG in el.attrib:
+        return None  # only an already-translated sibling was available; not usable as "the" value
+    return (el.text or "").strip() or None
 
 
 def _description_text(el: ET.Element | None) -> str | None:
@@ -101,7 +127,7 @@ def _parse_component(root: ET.Element) -> MetaInfo | None:
     info.app_id = (_untranslated(root, "id") or "").removesuffix(".desktop") or None
     info.name = _untranslated(root, "name")
     info.summary = _untranslated(root, "summary")
-    info.description = _description_text(root.find("description"))
+    info.description = _description_text(_untranslated_element(root, "description"))
     info.license = _untranslated(root, "project_license")
     dev = root.find("developer")
     if dev is not None:
@@ -127,4 +153,28 @@ def _parse_component(root: ET.Element) -> MetaInfo | None:
     rel = root.find("releases/release")
     if rel is not None and rel.get("version"):
         info.latest_version = rel.get("version")
+    info.icon = _best_cached_icon(root)
     return info
+
+
+def _best_cached_icon(root: ET.Element) -> str | None:
+    """The largest ``<icon type="cached">`` entry, as ``"<W>x<H>/<filename>"``.
+    "cached" is the one icon type every flatpak-builder-generated AppStream
+    catalogue includes (the others are a local icon-theme name with no file
+    ("stock") or a path whose base convention isn't consistent across remotes
+    ("remote")), and remotes that publish the collection catalogue this module
+    parses also serve these same files at a predictable, verified-working path:
+    ``<repo>/appstream/<arch>/icons/<W>x<H>/<filename>`` - constructing that full
+    URL is remotes.py's job, since only it knows the remote's own base path."""
+    best: tuple[int, str] | None = None
+    for icon in root.findall("icon"):
+        filename = (icon.text or "").strip()
+        if icon.get("type") != "cached" or not filename:
+            continue
+        try:
+            w, h = int(icon.get("width") or 0), int(icon.get("height") or 0)
+        except ValueError:
+            continue
+        if best is None or w > best[0]:
+            best = (w, f"{w}x{h}/{filename}")
+    return best[1] if best else None

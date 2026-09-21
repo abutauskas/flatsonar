@@ -25,12 +25,21 @@ APPSTREAM = """<?xml version="1.0" encoding="UTF-8"?>
     <project_license>MIT</project_license>
     <developer_name>Alice</developer_name>
     <url type="homepage">https://example.org/foo</url>
+    <icon type="cached" width="64" height="64">org.example.Foo.png</icon>
+    <icon type="cached" width="128" height="128">org.example.Foo.png</icon>
   </component>
   <component type="desktop-application">
     <id>com.example.Proprietary</id>
     <name>Proprietary Thing</name>
     <summary>Not open source</summary>
     <project_license>LicenseRef-proprietary</project_license>
+  </component>
+  <component type="desktop-application">
+    <id>io.github.bob.NoDeveloperTag</id>
+    <name>No Developer Tag</name>
+    <summary>Ships no developer/developer_name element at all</summary>
+    <project_license>MIT</project_license>
+    <url type="vcs-browser">https://github.com/bob/no-developer-tag</url>
   </component>
 </components>
 """
@@ -90,6 +99,7 @@ def _encode_summary(names: list[str]) -> bytes:
 SUMMARY = _encode_summary([
     "app/org.example.Foo/x86_64/stable",
     "app/com.example.Proprietary/x86_64/stable",
+    "app/io.github.bob.NoDeveloperTag/x86_64/stable",
     "runtime/org.freedesktop.Platform/x86_64/23.08",
 ])
 
@@ -115,18 +125,34 @@ def _ctx(appstream_ok: bool = True) -> FakeCtx:
     return FakeCtx(texts={"https://example.org/test.flatpakrepo": FLATPAKREPO}, blobs=blobs)
 
 
-def test_only_the_open_source_app_is_listed():
+def test_only_the_open_source_apps_are_listed():
     cands = asyncio.run(RemoteCatalogue("https://example.org/test.flatpakrepo").discover(_ctx()))
-    assert [c.app_id for c in cands] == ["org.example.Foo"]
-    c = cands[0]
+    by_id = {c.app_id: c for c in cands}
+    assert set(by_id) == {"org.example.Foo", "io.github.bob.NoDeveloperTag"}
+    c = by_id["org.example.Foo"]
     assert c.name == "Foo" and c.license == "MIT" and c.is_oss is True
     assert c.developer_name == "Alice" and c.homepage == "https://example.org/foo"
+    # The largest "cached" icon, resolved against this remote's own appstream/<arch>/
+    # icons/ path - verified against two real remotes (GNOME Nightly, Dolphin
+    # Emulator) to actually serve icons there; "remote"-type icons turned out not
+    # to have a consistent base path across remotes, so this doesn't use them.
+    assert c.icon_url == "https://repo.example/repo/appstream/x86_64/icons/128x128/org.example.Foo.png"
     assert len(c.sources) == 1
     src = c.sources[0]
     assert src.kind is SourceKind.REMOTE
     assert src.remote_url == "https://example.org/test.flatpakrepo"  # the .flatpakrepo file itself, not Url=
     assert src.remote_name == "test-remote"
     assert src.ref == "app/org.example.Foo/x86_64/stable"
+
+
+def test_developer_name_falls_back_to_the_repo_owner_when_appstream_has_none():
+    """A real bug this caught: GNOME's own official AppStream entries often have no
+    <developer>/<developer_name> element at all, and without this fallback the app
+    page showed a "Verified" trust badge next to no publisher name whatsoever -
+    looking, reasonably, like the opposite of verified."""
+    cands = asyncio.run(RemoteCatalogue("https://example.org/test.flatpakrepo").discover(_ctx()))
+    c = next(c for c in cands if c.app_id == "io.github.bob.NoDeveloperTag")
+    assert c.developer_name == "bob"
 
 
 def test_no_appstream_catalogue_yields_nothing():
@@ -166,4 +192,4 @@ def test_source_iterates_all_remotes_and_survives_one_failing(monkeypatch):
         return [c async for c in source.discover(ctx)]
 
     cands = asyncio.run(collect())
-    assert [c.app_id for c in cands] == ["org.example.Foo"]
+    assert {c.app_id for c in cands} == {"org.example.Foo", "io.github.bob.NoDeveloperTag"}

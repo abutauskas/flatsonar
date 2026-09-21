@@ -41,6 +41,7 @@ from ..models import SourceKind
 from . import funding
 from .appstream import MetaInfo, parse_collection
 from .base import Candidate, CrawlContext, SourceSpec
+from .credit import developer_from, normalise_repo_url
 from .forge import parse_flatpakrepo
 from .trust import assess
 
@@ -111,6 +112,7 @@ class RemoteCatalogue:
             if meta is None or not is_open_source(meta.license):
                 continue
             ref = _pick_ref(refs)
+            upstream = normalise_repo_url(meta.vcs)
             cand = Candidate(
                 app_id=app_id,
                 name=meta.name or app_id,
@@ -119,8 +121,9 @@ class RemoteCatalogue:
                 categories=meta.categories,
                 license=meta.license,
                 is_oss=True,
-                developer_name=meta.developer_name,
+                developer_name=developer_from(upstream, meta.developer_name),
                 upstream_url=meta.vcs,
+                icon_url=f"{base_url}/appstream/{arch}/icons/{meta.icon}" if meta.icon else None,
                 homepage=meta.homepage,
                 funding_links=funding.donation_link(meta.donation),
                 latest_version=meta.latest_version,

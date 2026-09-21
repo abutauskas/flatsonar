@@ -107,15 +107,27 @@ def find_metainfo(tree: list[str], app_id: str) -> str | None:
 
 
 def find_icon(tree: list[str], app_id: str) -> str | None:
+    """The best icon file for this app. Prefers the standard hicolor icon-theme
+    layout (``icons/hicolor/<size-or-scalable>/apps/<app_id>.<ext>``), which also
+    tells us how big a PNG is, but falls back to a bare basename match anywhere in
+    the tree (``assets/icons/<app_id>.svg``, ``data/<app_id>.png``, ...): most
+    projects only assemble the hicolor layout at install time via their build
+    system rather than committing it, but still name the source file after the
+    app id, and that fallback is still a real per-app icon - a much better result
+    than the generic account-avatar candidates_from_repo falls back to next."""
     best: tuple[int, str] | None = None
     for p in tree:
-        if not ICON_DIR.search(p) or not posixpath.basename(p).startswith(app_id + "."):
+        if not posixpath.basename(p).startswith(app_id + "."):
             continue
+        in_hicolor = bool(ICON_DIR.search(p))
         if p.endswith(".svg") and "symbolic" not in p:
-            score = 10_000
+            score = 10_000 if in_hicolor else 5_000
         elif p.endswith(".png"):
-            m = re.search(r"/(\d+)x\d+/", p)
-            score = int(m.group(1)) if m else 0
+            if in_hicolor:
+                m = re.search(r"/(\d+)x\d+/", p)
+                score = int(m.group(1)) if m else 0
+            else:
+                score = 100  # a same-named PNG with no size info: still better than no icon at all
         else:
             continue
         if re.search(r"\.(Devel|Nightly|Daily)\.", posixpath.basename(p)):

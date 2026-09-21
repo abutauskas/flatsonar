@@ -172,6 +172,26 @@ def test_forge_tree_helpers():
     assert find_icon(tree, "org.gnome.Foo") == "data/icons/hicolor/scalable/apps/org.gnome.Foo.svg"
 
 
+def test_find_icon_falls_back_to_a_bare_basename_match():
+    """Most real projects never commit the hicolor layout at all - they just have a
+    same-named icon file somewhere and let their build system install it into
+    hicolor at build time. Confirmed against real repos (e.g. ellie-commons/
+    app-generator's data/io.github.ellie_commons.app-generator.png, ajunior/
+    fragments' assets/icons/io.github.ajunior.fragments.svg) that were falling
+    back to the maintainer's GitHub avatar instead of any per-app icon at all."""
+    svg_elsewhere = ["README.md", "assets/icons/io.github.alice.Bar.svg", "data/screenshot.png"]
+    assert find_icon(svg_elsewhere, "io.github.alice.Bar") == "assets/icons/io.github.alice.Bar.svg"
+
+    png_elsewhere = ["data/io.github.alice.Bar.png"]
+    assert find_icon(png_elsewhere, "io.github.alice.Bar") == "data/io.github.alice.Bar.png"
+
+    # A properly-organised hicolor icon is still preferred over a same-named bare file.
+    both = ["assets/icons/io.github.alice.Bar.svg", "data/icons/hicolor/scalable/apps/io.github.alice.Bar.svg"]
+    assert find_icon(both, "io.github.alice.Bar") == "data/icons/hicolor/scalable/apps/io.github.alice.Bar.svg"
+
+    assert find_icon(["README.md", "com.unrelated.App.svg"], "io.github.alice.Bar") is None
+
+
 def test_metainfo_parse():
     xml = """<?xml version="1.0"?>
     <component type="desktop-application">
