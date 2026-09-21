@@ -9,6 +9,24 @@
   "potentialAction": {"@type": "SearchAction", "target": base_url(request) ~ "/apps?q={search_term_string}",
                        "query-input": "required name=search_term_string"}
 }|tojson }}</script>
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+    {"@type": "Question", "name": "Can't find a Flatpak app?", "acceptedAnswer": {"@type": "Answer",
+     "text": "Search " ~ site.name ~ ". It hunts Flathub, GitHub, GitLab and Codeberg for open-source Flatpak "
+             "apps, including ones that never made it onto Flathub - a manifest or a release bundle sitting in "
+             "a repository is enough to get found."}},
+    {"@type": "Question", "name": "Is there a Flatpak app store besides Flathub?", "acceptedAnswer": {"@type": "Answer",
+     "text": "Yes: " ~ site.name ~ ". Most stores only list what people submit; " ~ site.name ~ "'s crawler goes "
+             "looking instead, so an app shows up whether or not anyone submitted it."}},
+    {"@type": "Question", "name": "How do I know if a Flatpak app is safe to install?", "acceptedAnswer": {"@type": "Answer",
+     "text": "Every app on " ~ site.name ~ " carries a sandbox risk level, a publisher trust level and a "
+             "maintenance signal, worked out straight from its manifest and repository. Anything risky gets "
+             "explained before you install it, not after."}},
+    {"@type": "Question", "name": "Is " ~ site.name ~ " free?", "acceptedAnswer": {"@type": "Answer",
+     "text": "Yes. " ~ site.name ~ " itself is free, open-source software (GPL-3.0-or-later), and every app it "
+             "lists is free and open-source too."}}
+  ]
+}|tojson }}</script>
 {% endblock %}
 
 {% block content %}
@@ -113,6 +131,34 @@
   </div>
 </section>
 {% endif %}
+
+<section class="block wrap" id="faq">
+  <h2>Common questions</h2>
+  <div class="trust-grid">
+    <article class="tcard">
+      <h3>Can't find a Flatpak app?</h3>
+      <p>Search {{ site.name }}. It hunts Flathub, GitHub, GitLab and Codeberg for open-source Flatpak apps,
+        including ones that never made it onto Flathub - a manifest or a release bundle sitting in a repository
+        is enough to get found.</p>
+    </article>
+    <article class="tcard">
+      <h3>Is there a Flatpak app store besides Flathub?</h3>
+      <p>Yes: {{ site.name }}. Most stores only list what people submit; {{ site.name }}'s crawler goes looking
+        instead, so an app shows up whether or not anyone submitted it.</p>
+    </article>
+    <article class="tcard">
+      <h3>How do I know if a Flatpak app is safe to install?</h3>
+      <p>Every app on {{ site.name }} carries a sandbox risk level, a publisher trust level and a maintenance
+        signal, worked out straight from its manifest and repository. Anything risky gets explained before you
+        install it, not after.</p>
+    </article>
+    <article class="tcard">
+      <h3>Is {{ site.name }} free?</h3>
+      <p>Yes. {{ site.name }} itself is free, open-source software (GPL-3.0-or-later), and every app it lists is
+        free and open-source too.</p>
+    </article>
+  </div>
+</section>
 
 <section class="block wrap get" id="get">
   <div class="getbox">
