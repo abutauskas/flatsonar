@@ -45,6 +45,7 @@ document.addEventListener('keydown', function (e) {
   var nextBtn = overlay.querySelector('.lightbox-nav.next');
   if (!links.length || !img) return;
   var index = 0;
+  var trigger = null;
 
   function show(i) {
     index = (i + links.length) % links.length;
@@ -55,7 +56,14 @@ document.addEventListener('keydown', function (e) {
     prevBtn.hidden = nextBtn.hidden = !multi;
   }
 
-  function open(i) {
+  // Tab/Shift+Tab cycles only through the lightbox's own controls while it's
+  // open, instead of escaping into the (still-focusable) page behind it.
+  function focusable() {
+    return [closeBtn, prevBtn, nextBtn].filter(function (el) { return el && !el.hidden; });
+  }
+
+  function open(i, fromEl) {
+    trigger = fromEl || document.activeElement;
     show(i);
     overlay.hidden = false;
     document.body.style.overflow = 'hidden';
@@ -65,12 +73,13 @@ document.addEventListener('keydown', function (e) {
   function close() {
     overlay.hidden = true;
     document.body.style.overflow = '';
+    if (trigger && trigger.focus) trigger.focus();
   }
 
   links.forEach(function (a, i) {
     a.addEventListener('click', function (e) {
       e.preventDefault();
-      open(i);
+      open(i, a);
     });
   });
 
@@ -82,9 +91,15 @@ document.addEventListener('keydown', function (e) {
   });
   document.addEventListener('keydown', function (e) {
     if (overlay.hidden) return;
-    if (e.key === 'Escape') close();
-    else if (e.key === 'ArrowLeft') show(index - 1);
-    else if (e.key === 'ArrowRight') show(index + 1);
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key === 'ArrowLeft') { show(index - 1); return; }
+    if (e.key === 'ArrowRight') { show(index + 1); return; }
+    if (e.key !== 'Tab') return;
+    var items = focusable();
+    if (!items.length) return;
+    var first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
 })();
 
