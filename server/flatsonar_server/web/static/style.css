@@ -390,7 +390,9 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
   .topsearch { display: none; }
   .nav { margin-left: auto; }
   .hero { padding: 64px 0 56px; }
+  .hero h1 { font-size: clamp(2.1rem, 9vw, 2.6rem); }
   .rings i, .rings b { left: 88%; top: 18%; }
+  .rings i { min-width: 220px; min-height: 220px; }
   .stats { grid-template-columns: repeat(2, 1fr); margin-top: -28px; }
   .block { padding-top: 48px; }
   .cards3, .trust-grid { grid-template-columns: 1fr; }
@@ -408,4 +410,17 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
   .support-row { justify-content: flex-start; }
   .shots img { height: 200px; }
   .footlinks { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  /* Brand + nav (Apps/About/GitHub) overflow the topbar on real phone widths
+     (~26px over budget at 375px, worse at 360/320px) once topsearch is hidden. */
+  .topbar .wrap { gap: 6px; }
+  .brand { font-size: 1.05rem; }
+  .nav { gap: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a { padding: 8px 8px; white-space: nowrap; }
+  /* 5 filter selects in 2 columns clip their own text at this width
+     ("Verified or Flathub", "Quiet or abandoned", ...). */
+  .toolbar { grid-template-columns: 1fr; }
+  .toolbar input.search { grid-column: auto; }
 }
