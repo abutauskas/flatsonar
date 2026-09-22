@@ -1,0 +1,13 @@
+{
+  "name": "Flatsonar",
+  "short_name": "Flatsonar",
+  "description": "Open-source Flatpak apps, hunted from everywhere.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1116",
+  "theme_color": "#0b1116",
+  "icons": [
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
