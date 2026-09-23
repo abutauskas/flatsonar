@@ -20,7 +20,7 @@
 
 {% macro trust_corner(level, size=18, cls='trust-corner') -%}
 {% if TRUST_BADGE_ICON.get(level) %}
-<img class="{{ cls }}" src="/static/{{ TRUST_BADGE_ICON[level] }}" width="{{ size }}" height="{{ size }}" alt="{{ TRUST_TEXT.get(level, level) }}" title="{{ TRUST_TIP.get(level, '') }}">
+<img class="{{ cls }}" src="/static/{{ TRUST_BADGE_ICON[level] }}" width="{{ size }}" height="{{ size }}" alt="{{ TRUST_TEXT.get(level, level) }}" title="{{ TRUST_TEXT.get(level, level) }}">
 {%- endif %}
 {%- endmacro %}
 
