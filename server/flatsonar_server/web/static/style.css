@@ -198,20 +198,20 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 
 /* --- app cards -------------------------------------------------------------------- */
 
-.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; align-items: start; }
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; align-items: start; }
 .app-card {
-  display: flex; gap: 16px; padding: 20px; min-width: 0;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+  display: flex; gap: 18px; padding: 24px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
   box-shadow: 0 1px 2px rgba(15, 23, 32, .03);
   color: inherit; text-decoration: none; transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
 }
 .app-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); text-decoration: none; }
-.app-card .icon { width: 68px; height: 68px; border-radius: 16px; flex: none; background: var(--surface-2); object-fit: contain; }
-.app-card .meta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.app-card .name { display: flex; align-items: center; gap: 5px; min-width: 0; font-weight: 700; font-size: 1.08rem; }
+.app-card .icon { width: 80px; height: 80px; border-radius: 18px; flex: none; background: var(--surface-2); object-fit: contain; }
+.app-card .meta { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.app-card .name { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 700; font-size: 1.2rem; }
 .app-card .name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.app-card .dev { color: var(--muted); font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.app-card .summary { color: var(--muted); font-size: .94rem; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.app-card .dev { color: var(--muted); font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-card .summary { color: var(--muted); font-size: .98rem; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .app-card[hidden] { display: none; }  /* [hidden] alone loses to the display:flex above */
 
 /* A small badge icon: how verified/reviewed/suspicious read at a glance, instead of

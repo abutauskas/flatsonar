@@ -29,9 +29,9 @@
    data-maintenance="{{ app.maintenance }}" data-where="{{ 'flathub' if app.on_flathub else 'hunted' }}"
    data-stars="{{ app.stars or 0 }}" data-updated="{{ app.updated_at|isodate if app.updated_at else '' }}"
    data-created="{{ app.first_seen|isodate if app.first_seen else '' }}">
-  {{ icon(app, 68) }}
+  {{ icon(app, 80) }}
   <div class="meta">
-    <div class="name"><span>{{ app.name }}</span>{{ trust_corner(app.trust, 16, 'trust-inline') }}</div>
+    <div class="name"><span>{{ app.name }}</span>{{ trust_corner(app.trust, 18, 'trust-inline') }}</div>
     {% if app.developer_name %}<div class="dev">by {{ app.developer_name }}{% if app.maintenance == 'abandoned' or app.archived %} · looks abandoned{% elif app.maintenance == 'stale' %} · quiet for a while{% endif %}</div>{% endif %}
     <div class="summary">{{ app.summary }}</div>
   </div>
