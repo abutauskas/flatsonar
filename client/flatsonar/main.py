@@ -35,6 +35,11 @@ def main(argv: list[str] | None = None) -> int:
     class FlatsonarApp(Adw.Application):
         def __init__(self):
             super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+            # Match the website's teal brand instead of the system's default accent.
+            # Named accent colors need libadwaita >= 1.6; older systems keep the system accent.
+            style_manager = Adw.StyleManager.get_default()
+            if hasattr(style_manager, "set_accent_color") and hasattr(Adw, "AccentColor"):
+                style_manager.set_accent_color(Adw.AccentColor.TEAL)
             self.window: FlatsonarWindow | None = None
             for name, cb in (("refresh", self._refresh), ("forget", self._forget), ("about", self._about),
                              ("installed", self._installed), ("quit", lambda *_: self.quit())):

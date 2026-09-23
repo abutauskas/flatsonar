@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, risk_pill, trust_pill, maintenance_pill %}
+{% from "_macros.html" import icon, risk_pill, trust_badge, trust_corner %}
 {% block title %}{{ app.name }} - {{ site.name }}{% endblock %}
 {% block description %}{{ app.summary or (app.name ~ ' on ' ~ site.name) }}{% endblock %}
 {% block canonical %}{{ base_url(request) }}/apps/{{ app.app_id }}{% endblock %}
@@ -24,20 +24,23 @@
 {% block content %}
 <article class="wrap apppage">
   <header class="app-head">
-    {{ icon(app, 112) }}
+    <div class="icon-wrap">
+      {{ icon(app, 112) }}
+      {{ trust_corner(app.trust, 28) }}
+    </div>
     <div class="titles">
       <h1>{{ app.name }}</h1>
       {% if app.developer_name %}<p class="by">by {{ app.developer_name }}</p>{% endif %}
       <p class="summary">{{ app.summary }}</p>
       <div class="pills big">
         {{ risk_pill(app.risk_level) }}
-        {{ trust_pill(app.trust) }}
-        {% if app.maintenance and app.maintenance != 'active' %}{{ maintenance_pill(app.maintenance) }}
-        {% elif app.archived %}<span class="pill" title="The upstream repository is archived; Flathub still ships this build">Archived</span>{% endif %}
-        {% if not app.manifest_ok %}<span class="pill yellow" title="The crawler's last visit could no longer parse this app's manifest; the listing below may be out of date">Build may be broken</span>{% endif %}
-        {% if app.license %}<span class="pill" title="SPDX license">{{ app.license }}</span>{% endif %}
-        {% if app.latest_version %}<span class="pill" title="Latest version">v{{ app.latest_version }}</span>{% endif %}
+        {{ trust_badge(app.trust) }}
       </div>
+      {% set notes = [] %}
+      {% if app.maintenance == 'abandoned' or app.archived %}{% set _ = notes.append('Looks abandoned') %}
+      {% elif app.maintenance == 'stale' %}{% set _ = notes.append('Quiet for a while') %}{% endif %}
+      {% if not app.manifest_ok %}{% set _ = notes.append('Build may be broken') %}{% endif %}
+      {% if notes %}<p class="fine note">{{ notes|join(' · ') }}</p>{% endif %}
     </div>
     <div class="head-actions">
       <a class="btn primary" href="#install">Install</a>
@@ -55,7 +58,7 @@
       {% for link in app.funding_links %}
       <a class="btn support" href="{{ link.url }}" rel="noopener" title="{{ link.url }}">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg>
-        {{ link.platform|funding_label }}
+        {{ link|funding_label }}
       </a>
       {% endfor %}
     </div>

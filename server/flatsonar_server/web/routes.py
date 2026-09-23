@@ -38,11 +38,13 @@ SITE = {
 }
 
 # Wording shared with the desktop client (client/flatsonar/widgets.py).
-RISK_TEXT = {"green": "Sandboxed", "yellow": "Broad permissions", "red": "Dangerous permissions"}
+RISK_TEXT = {"green": "Sandboxed", "yellow": "Broad permissions", "red": "Extensive permissions"}
 RISK_TIP = {
     "green": "Only ordinary sandbox permissions.",
     "yellow": "Asks for permissions that weaken the sandbox. Flatsonar warns before installing.",
-    "red": "Asks for permissions that effectively escape the sandbox. Flatsonar warns twice.",
+    "red": "Asks for permissions that reach well outside the sandbox: full filesystem or bus access, "
+           "for example. Plenty of legitimate apps need this to do their job. Flatsonar warns twice before "
+           "installing, since nobody has reviewed whether the app actually needs it.",
 }
 TRUST_TEXT = {"verified": "Verified creator", "reviewed": "Flathub reviewed", "unverified": "Unverified publisher",
               "suspicious": "Suspicious publisher"}
@@ -66,7 +68,7 @@ FUNDING_LABEL = {
     "open_collective": "Open Collective", "buy_me_a_coffee": "Buy Me a Coffee", "custom": "Donate",
 }
 SORT_LABELS = [("name", "Name"), ("stars", "Most starred"), ("updated", "Recently updated"), ("newest", "Newest")]
-RISK_FILTERS = [("", "Any risk"), ("green", "Sandboxed only"), ("yellow", "Broad permissions"), ("red", "Dangerous")]
+RISK_FILTERS = [("", "Any risk"), ("green", "Sandboxed only"), ("yellow", "Broad permissions"), ("red", "Extensive permissions")]
 TRUST_FILTERS = [("", "Any publisher"), ("verified", "Verified creators"), ("verified,reviewed", "Verified or Flathub"),
                  ("unverified,suspicious", "Unverified only")]
 MAINTENANCE_FILTERS = [("", "Any maintenance"), ("active", "Actively maintained"), ("stale,abandoned", "Quiet or abandoned")]
@@ -93,8 +95,16 @@ def paragraphs(text: str | None) -> Markup:
     return Markup("".join(out))
 
 
-def funding_label(platform: str) -> str:
-    return FUNDING_LABEL.get(platform, platform.replace("_", " ").title())
+def funding_label(link: dict[str, str]) -> str:
+    """One app can list several links on the same platform (e.g. FUNDING.yml's
+    ``github:`` accepts up to four usernames); tag each with its handle so they
+    don't render as identical, unexplained duplicate buttons."""
+    platform = link.get("platform", "")
+    base = FUNDING_LABEL.get(platform, platform.replace("_", " ").title())
+    if platform == "custom":
+        return base  # an arbitrary donation page, not a per-person handle
+    handle = link.get("url", "").rstrip("/").rsplit("/", 1)[-1]
+    return f"{base} · {handle}" if handle else base
 
 
 def install_options(app: App) -> list[dict[str, Any]]:

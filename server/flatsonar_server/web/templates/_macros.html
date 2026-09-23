@@ -7,19 +7,22 @@
 <span class="pill {{ level }}" title="{{ RISK_TIP.get(level, '') }}"><span class="dot"></span>{{ RISK_TEXT.get(level, level) }}</span>
 {%- endmacro %}
 
-{% macro trust_pill(level) -%}
-{% set style = {'verified': 'green', 'reviewed': 'blue', 'unverified': 'yellow', 'suspicious': 'red'}.get(level, 'yellow') %}
-<span class="pill {{ style }}" title="{{ TRUST_TIP.get(level, '') }}">
-  {% if level == 'verified' %}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  {% elif level == 'suspicious' %}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2l6.5 11.5h-13z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 6.5v3M8 11.6v.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-  {% else %}<span class="dot"></span>{% endif %}
-  {{ TRUST_TEXT.get(level, level) }}
-</span>
+{% set TRUST_BADGE_ICON = {'verified': 'verified-publisher.svg', 'reviewed': 'flathub-verified.svg', 'suspicious': 'sus-publisher.svg'} %}
+
+{% macro trust_badge(level) -%}
+{% if TRUST_BADGE_ICON.get(level) %}
+<span class="trust-badge {{ level }}" title="{{ TRUST_TIP.get(level, '') }}"><img src="/static/{{ TRUST_BADGE_ICON[level] }}" width="16" height="16" alt="">{{ TRUST_TEXT.get(level, level) }}</span>
+{%- endif %}
 {%- endmacro %}
 
-{% macro maintenance_pill(level) -%}
-{% set style = {'stale': '', 'abandoned': 'yellow'}.get(level, '') %}
-<span class="pill {{ style }}" title="{{ MAINTENANCE_TIP.get(level, '') }}">{{ MAINTENANCE_TEXT.get(level, level) }}</span>
+{% macro trust_corner(level, size=18) -%}
+{% if TRUST_BADGE_ICON.get(level) %}
+<img class="trust-corner" src="/static/{{ TRUST_BADGE_ICON[level] }}" width="{{ size }}" height="{{ size }}" alt="{{ TRUST_TEXT.get(level, level) }}" title="{{ TRUST_TIP.get(level, '') }}">
+{%- endif %}
+{%- endmacro %}
+
+{% macro heart_mark() -%}
+<span class="heart-mark" title="Has a sponsor link"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg></span>
 {%- endmacro %}
 
 {% macro app_card(app) -%}
@@ -30,18 +33,17 @@
    data-maintenance="{{ app.maintenance }}" data-where="{{ 'flathub' if app.on_flathub else 'hunted' }}"
    data-stars="{{ app.stars or 0 }}" data-updated="{{ app.updated_at|isodate if app.updated_at else '' }}"
    data-created="{{ app.first_seen|isodate if app.first_seen else '' }}">
-  {{ icon(app) }}
+  <div class="icon-wrap">
+    {{ icon(app) }}
+    {{ trust_corner(app.trust) }}
+  </div>
   <div class="meta">
     <div class="name">{{ app.name }}</div>
-    {% if app.developer_name %}<div class="dev">by {{ app.developer_name }}</div>{% endif %}
+    {% if app.developer_name %}<div class="dev">by {{ app.developer_name }}{% if app.maintenance == 'abandoned' or app.archived %} · looks abandoned{% elif app.maintenance == 'stale' %} · quiet for a while{% endif %}</div>{% endif %}
     <div class="summary">{{ app.summary }}</div>
     <div class="pills">
       {{ risk_pill(app.risk_level) }}
-      {% if app.trust != 'reviewed' %}{{ trust_pill(app.trust) }}{% endif %}
-      {% if app.maintenance and app.maintenance != 'active' %}{{ maintenance_pill(app.maintenance) }}
-      {% elif app.archived %}<span class="pill" title="The upstream repository is archived; Flathub still ships this build">Archived</span>{% endif %}
-      {% if app.manifest_ok == false %}<span class="pill yellow" title="The crawler's last visit could no longer parse this app's manifest; the listing below may be out of date">Build may be broken</span>{% endif %}
-      {% if app.funding_links %}<span class="pill heart" title="Has a sponsor link"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg>Sponsor</span>{% endif %}
+      {% if app.funding_links %}{{ heart_mark() }}{% endif %}
     </div>
   </div>
 </a>

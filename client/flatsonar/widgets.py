@@ -9,7 +9,7 @@ from .icons import load_into
 
 RISK_ICON = {"green": "security-high-symbolic", "yellow": "security-medium-symbolic", "red": "security-low-symbolic"}
 RISK_CSS = {"green": "success", "yellow": "warning", "red": "error"}
-RISK_TEXT = {"green": "Sandboxed", "yellow": "Broad permissions", "red": "Dangerous permissions"}
+RISK_TEXT = {"green": "Sandboxed", "yellow": "Broad permissions", "red": "Extensive permissions"}
 
 # Publisher trust, from the server's provenance checks. Never let unverified look verified.
 TRUST_TEXT = {"verified": "Verified creator", "reviewed": "Flathub reviewed", "unverified": "Unverified publisher",
@@ -51,7 +51,9 @@ def risk_pill(level: str) -> Gtk.Widget:
     pill.set_tooltip_text({
         "green": "Only ordinary sandbox permissions.",
         "yellow": "Asks for permissions that weaken the sandbox. You'll be warned before installing.",
-        "red": "Asks for permissions that effectively escape the sandbox. You'll be warned twice.",
+        "red": "Asks for permissions that reach well outside the sandbox: full filesystem or bus access, "
+               "for example. Plenty of legitimate apps need this. Nobody has reviewed whether this one "
+               "actually does, so you'll be warned twice.",
     }.get(level, ""))
     return pill
 
