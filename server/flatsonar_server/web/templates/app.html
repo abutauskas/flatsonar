@@ -70,7 +70,7 @@
       {% if app.screenshots %}
       <section class="shots" aria-label="Screenshots" data-lightbox>
         {% for url in app.screenshots[:8] %}
-        <a href="{{ url }}" rel="noopener"><img src="{{ url }}" alt="Screenshot {{ loop.index }} of {{ app.name }}" loading="lazy" decoding="async"></a>
+        <a href="{{ url }}" rel="noopener"><img src="{{ url }}" alt="Screenshot {{ loop.index }}" loading="lazy" decoding="async"></a>
         {% endfor %}
       </section>
       <div class="lightbox" data-lightbox-overlay role="dialog" aria-modal="true" aria-label="Screenshot viewer" hidden>
