@@ -198,7 +198,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 
 /* --- app cards -------------------------------------------------------------------- */
 
-.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; align-items: start; }
 .app-card {
   display: flex; gap: 16px; padding: 20px; min-width: 0;
   background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
