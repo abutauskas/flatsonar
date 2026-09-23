@@ -237,7 +237,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .cats a span { color: var(--muted); font-size: .85em; }
 .cats a:hover { background: var(--surface-2); }
 .cats a[aria-current] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
-.toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) repeat(4, max-content); gap: 10px; align-items: center; margin-bottom: 14px; }
+.toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) repeat(5, max-content); gap: 10px; align-items: center; margin-bottom: 14px; }
 .toolbar input.search { min-width: 0; width: 100%; }
 .js .nojs { display: none; }
 .count { color: var(--muted); margin: 0 0 18px; }
