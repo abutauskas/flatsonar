@@ -24,6 +24,7 @@ when the update *adds* something they have not already accepted.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import shutil
@@ -103,6 +104,15 @@ def version_newer(latest: str | None, installed: str | None) -> bool:
     except ImportError:
         pass
     return _numeric(latest) > _numeric(installed)
+
+
+def _newest_installed_runtime_branch(runtime_id: str) -> str | None:
+    """The highest numeric branch of ``runtime_id`` already installed (user or system),
+    e.g. "48" if GNOME 46/47/48 are all installed. None if none is installed, or none
+    of the installed branches are plain integers (a "master"/name branch, say)."""
+    branches = [int(b) for b in (r.ref.rsplit("/", 1)[-1] for r in fp.installed_runtimes() if r.app_id == runtime_id)
+                if b.isdigit()]
+    return str(max(branches)) if branches else None
 
 
 def update_available(app: AppInfo, installed: InstalledApp, remote_updates: set[str]) -> bool:
@@ -235,8 +245,37 @@ def _pull_update(app: AppInfo, installed: InstalledApp, status) -> _Prepared:
     return prep
 
 
+def _prefer_installed_gnome_runtime(mpath: Path, status) -> Path:
+    """GNOME runtimes are meant to be forward-compatible, and flatpak-builder happily
+    builds against a newer org.gnome.Platform branch than a manifest asks for. Rather
+    than pull a second, separate runtime just for this one app, reuse whichever GNOME
+    branch is already the newest on this machine - unless that would mean *downgrading*
+    below what the manifest declares, which is far more likely to actually break the
+    build than a newer one is."""
+    try:
+        manifest = parse_manifest(mpath)
+    except (ManifestError, OSError):
+        return mpath
+    if manifest.runtime != "org.gnome.Platform":
+        return mpath
+    newest = _newest_installed_runtime_branch(manifest.runtime)
+    declared = manifest.runtime_version
+    if not newest or (declared and declared.isdigit() and int(newest) <= int(declared)):
+        return mpath
+
+    _status(status, f"Using your installed GNOME {newest} runtime instead of {declared or 'downloading a new one'}…")
+    raw = dict(manifest.raw)
+    raw["runtime-version"] = newest
+    if "sdk-version" in raw:  # rare, but keep runtime and sdk in lockstep if it's set
+        raw["sdk-version"] = newest
+    pinned = mpath.with_name(f"{mpath.stem}.gnome{newest}.json")
+    pinned.write_text(json.dumps(raw), encoding="utf-8")
+    return pinned
+
+
 def _build(app: AppInfo, source: InstallSource, mpath: Path, status) -> _Prepared:
     prep = _Prepared(source)
+    mpath = _prefer_installed_gnome_runtime(mpath, status)
     _status(status, f"Building {app.name} from source with flatpak-builder (this can take a while)…")
     repo, ref = fp.build_from_manifest(mpath, app.app_id, on_line=status)
     prep.local_repo, prep.ref = repo, ref

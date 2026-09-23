@@ -1,5 +1,6 @@
 """The warn-twice install flow, with flatpak/ostree/clamav replaced by fakes."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -290,6 +291,62 @@ def test_manifest_for_other_app_id_is_red(fake_flatpak, tmp_path):
     conf = FakeConfirmer([False])
     out = pipeline.install(_app(kind="manifest"), api, conf, _decisions(tmp_path))
     assert out.cancelled and any("builds org.evil.Other, not org.x.Green" in r for r in out.report.reasons)
+
+
+# --- manifest builds: reuse an already-installed GNOME runtime ------------------------
+
+
+def _capturing_build(seen, calls, tmp_path):
+    def _build(mpath, app_id, on_line=None):
+        seen["path"] = mpath
+        calls.append(("build", app_id))
+        return tmp_path / "repo", f"app/{app_id}/x86_64/master"
+
+    return _build
+
+
+def test_manifest_build_prefers_newer_installed_gnome_runtime(fake_flatpak, tmp_path, monkeypatch):
+    calls, _ = fake_flatpak
+    monkeypatch.setattr(fp, "installed_runtimes", lambda: [
+        InstalledApp("org.gnome.Platform", ref="runtime/org.gnome.Platform/x86_64/46"),
+        InstalledApp("org.gnome.Platform", ref="runtime/org.gnome.Platform/x86_64/48"),  # newest, out of order
+    ])
+    seen: dict = {}
+    monkeypatch.setattr(fp, "build_from_manifest", _capturing_build(seen, calls, tmp_path))
+    api = FakeAPI(CLEAN_MANIFEST.format(app_id="org.x.Green"))  # declares runtime-version 47
+    out = pipeline.install(_app(kind="manifest"), api, FakeConfirmer([True]), _decisions(tmp_path))
+    assert out.installed
+    assert seen["path"].name == "org.x.Green.gnome48.json"
+    assert json.loads(seen["path"].read_text())["runtime-version"] == "48"
+
+
+def test_manifest_build_does_not_downgrade_gnome_runtime(fake_flatpak, tmp_path, monkeypatch):
+    """Only the 46 branch is installed; the manifest asks for 47. Build with what the
+    manifest declares (flatpak-builder pulls 47 itself) rather than downgrade."""
+    calls, _ = fake_flatpak
+    monkeypatch.setattr(fp, "installed_runtimes", lambda: [
+        InstalledApp("org.gnome.Platform", ref="runtime/org.gnome.Platform/x86_64/46"),
+    ])
+    seen: dict = {}
+    monkeypatch.setattr(fp, "build_from_manifest", _capturing_build(seen, calls, tmp_path))
+    api = FakeAPI(CLEAN_MANIFEST.format(app_id="org.x.Green"))
+    out = pipeline.install(_app(kind="manifest"), api, FakeConfirmer([True]), _decisions(tmp_path))
+    assert out.installed
+    assert seen["path"].name == "org.x.Green.yml"  # untouched
+
+
+def test_manifest_build_ignores_non_gnome_runtime(fake_flatpak, tmp_path, monkeypatch):
+    calls, _ = fake_flatpak
+    monkeypatch.setattr(fp, "installed_runtimes", lambda: [
+        InstalledApp("org.freedesktop.Platform", ref="runtime/org.freedesktop.Platform/x86_64/24.08"),
+    ])
+    seen: dict = {}
+    monkeypatch.setattr(fp, "build_from_manifest", _capturing_build(seen, calls, tmp_path))
+    other_runtime = CLEAN_MANIFEST.replace("runtime: org.gnome.Platform", "runtime: org.freedesktop.Platform")
+    api = FakeAPI(other_runtime.format(app_id="org.x.Green"))
+    out = pipeline.install(_app(kind="manifest"), api, FakeConfirmer([True]), _decisions(tmp_path))
+    assert out.installed
+    assert seen["path"].name == "org.x.Green.yml"  # untouched
 
 
 def test_second_gate_only_when_build_adds_findings(fake_flatpak, tmp_path):

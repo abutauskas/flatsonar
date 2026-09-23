@@ -132,6 +132,16 @@ def installed_ids() -> set[str]:
     return {a.app_id for a in installed_apps()}
 
 
+def installed_runtimes() -> list[InstalledApp]:
+    """Every installed runtime (org.gnome.Platform, org.kde.Platform, ...), user *and*
+    system. Same row shape as :func:`installed_apps`; ``app_id`` is the runtime id."""
+    try:
+        out = _run(["flatpak", "list", "--runtime", f"--columns={_LIST_COLUMNS}"])
+    except (FlatpakError, OSError):
+        return []
+    return parse_installed(out)
+
+
 def _installation_flag(installation: str) -> str:
     return f"--{installation}" if installation in INSTALLATIONS else f"--installation={installation}"
 
