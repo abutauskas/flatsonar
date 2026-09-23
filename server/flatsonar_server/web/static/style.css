@@ -198,7 +198,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 
 /* --- app cards -------------------------------------------------------------------- */
 
-.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; align-items: start; }
+.app-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
 .app-card {
   display: flex; gap: 18px; padding: 24px; min-width: 0;
   background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
@@ -390,7 +390,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 /* --- responsive ------------------------------------------------------------------- */
 
 @media (max-width: 1000px) {
-  .cards3, .trust-grid { grid-template-columns: repeat(2, 1fr); }
+  .cards3, .trust-grid, .app-grid { grid-template-columns: repeat(2, 1fr); }
   .app-body { grid-template-columns: 1fr; }
   .aside { order: -1; }
   .getbox { grid-template-columns: 1fr; }
@@ -406,7 +406,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
   .rings i { min-width: 220px; min-height: 220px; }
   .stats { grid-template-columns: repeat(2, 1fr); margin-top: -28px; }
   .block { padding-top: 48px; }
-  .cards3, .trust-grid { grid-template-columns: 1fr; }
+  .cards3, .trust-grid, .app-grid { grid-template-columns: 1fr; }
   .rowhead { flex-direction: column; align-items: flex-start; gap: 4px; }
   .catalogue { grid-template-columns: 1fr; gap: 18px; padding-top: 20px; }
   .toolbar { grid-template-columns: 1fr 1fr; }
