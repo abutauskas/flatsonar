@@ -243,9 +243,9 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .count { color: var(--muted); margin: 0 0 18px; }
 .empty { text-align: center; padding: 64px 20px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
 .pager { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 36px 0 0; }
-.pager a, .pager span { padding: 9px 16px; border-radius: 999px; border: 1px solid var(--border); text-decoration: none; color: var(--text); }
-.pager a:hover { border-color: var(--accent); }
-.pager .disabled { color: var(--muted); opacity: .6; }
+.pager a, .pager span, .pager button { padding: 9px 16px; border-radius: 999px; border: 1px solid var(--border); text-decoration: none; color: var(--text); background: none; font: inherit; cursor: pointer; }
+.pager a:hover, .pager button:not(:disabled):hover { border-color: var(--accent); }
+.pager .disabled, .pager button:disabled { color: var(--muted); opacity: .6; cursor: default; }
 .pager .where { border: none; color: var(--muted); }
 
 .radar-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 40px 0; color: var(--accent); }

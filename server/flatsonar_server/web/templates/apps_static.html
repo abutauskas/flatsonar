@@ -56,9 +56,11 @@
       <p>Try another search or loosen the filters. The hunt is ongoing: <a href="/feed.xml">follow the feed</a> for new finds.</p>
     </div>
 
-    <div class="loadmore" data-loadmore hidden>
-      <button class="btn ghost" type="button" data-loadmore-btn>Load more</button>
-    </div>
+    <nav class="pager" data-pager hidden aria-label="Pages">
+      <button type="button" data-page-prev>← Previous</button>
+      <span class="where" data-page-where></span>
+      <button type="button" data-page-next>Next →</button>
+    </nav>
   </section>
 </div>
 {% endblock %}

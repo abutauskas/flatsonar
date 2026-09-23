@@ -121,10 +121,12 @@ document.addEventListener('keydown', function (e) {
   var cards = grid ? Array.prototype.slice.call(grid.children) : [];
   var countEl = root.querySelector('[data-count]');
   var emptyEl = root.querySelector('[data-empty]');
-  var loadmoreWrap = root.querySelector('[data-loadmore]');
-  var loadmoreBtn = root.querySelector('[data-loadmore-btn]');
+  var pagerEl = root.querySelector('[data-pager]');
+  var prevBtn = root.querySelector('[data-page-prev]');
+  var nextBtn = root.querySelector('[data-page-next]');
+  var whereEl = root.querySelector('[data-page-where]');
   var pageSize = parseInt(root.getAttribute('data-page-size'), 10) || 36;
-  var shown = pageSize;
+  var page = 1;
   var catLinks = document.querySelectorAll('[data-cat]');
 
   if (!grid || !cards.length) return;
@@ -141,6 +143,7 @@ document.addEventListener('keydown', function (e) {
     trustSel.value = p.get('trust') || '';
     maintenanceSel.value = p.get('maintenance') || '';
     sortSel.value = p.get('sort') || 'name';
+    page = parseInt(p.get('page'), 10) || 1;
   }
 
   function writeStateToUrl(categoryOverride) {
@@ -153,6 +156,7 @@ document.addEventListener('keydown', function (e) {
     if (trustSel.value) p.set('trust', trustSel.value);
     if (maintenanceSel.value) p.set('maintenance', maintenanceSel.value);
     if (sortSel.value && sortSel.value !== 'name') p.set('sort', sortSel.value);
+    if (page > 1) p.set('page', page);
     var qs = p.toString();
     history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
   }
@@ -213,7 +217,9 @@ document.addEventListener('keydown', function (e) {
       };
     }
     var visible = cards.filter(matches).sort(sorter);
-    var toShow = visible.slice(0, shown);
+    var totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+    page = Math.min(Math.max(page, 1), totalPages);
+    var toShow = visible.slice((page - 1) * pageSize, page * pageSize);
     var wanted = {};
     toShow.forEach(function (c) { wanted[c.dataset.id] = true; grid.appendChild(c); });
     cards.forEach(function (c) { c.hidden = !wanted[c.dataset.id]; });
@@ -223,9 +229,10 @@ document.addEventListener('keydown', function (e) {
       (q.value.trim() ? ' matching “' + q.value.trim() + '”' : '') + (cat ? ' in ' + cat : '');
     emptyEl.hidden = visible.length !== 0;
 
-    var remaining = visible.length - toShow.length;
-    loadmoreWrap.hidden = remaining <= 0;
-    if (remaining > 0) loadmoreBtn.textContent = 'Load ' + Math.min(pageSize, remaining) + ' more (' + remaining + ' left)';
+    pagerEl.hidden = totalPages <= 1;
+    whereEl.textContent = 'Page ' + page + ' of ' + totalPages;
+    prevBtn.disabled = page <= 1;
+    nextBtn.disabled = page >= totalPages;
 
     catLinks.forEach(function (a) {
       if ((a.getAttribute('data-cat') || '') === cat) a.setAttribute('aria-current', 'true');
@@ -233,8 +240,15 @@ document.addEventListener('keydown', function (e) {
     });
   }
 
+  function goToPage(p) {
+    page = p;
+    writeStateToUrl();
+    render();
+    root.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+
   function onFilterChange() {
-    shown = pageSize;
+    page = 1;
     writeStateToUrl();
     render();
   }
@@ -255,17 +269,15 @@ document.addEventListener('keydown', function (e) {
   catLinks.forEach(function (a) {
     a.addEventListener('click', function (e) {
       e.preventDefault();
-      shown = pageSize;
+      page = 1;
       writeStateToUrl(a.getAttribute('data-cat') || '');
       render();
       root.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
   });
 
-  loadmoreBtn.addEventListener('click', function () {
-    shown += pageSize;
-    render();
-  });
+  prevBtn.addEventListener('click', function () { if (page > 1) goToPage(page - 1); });
+  nextBtn.addEventListener('click', function () { goToPage(page + 1); });
 
   readStateFromUrl();
   render();
