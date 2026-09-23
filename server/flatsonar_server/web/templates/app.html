@@ -3,7 +3,9 @@
 {% block title %}{{ app.name }} - {{ site.name }}{% endblock %}
 {% block description %}{{ app.summary or (app.name ~ ' on ' ~ site.name) }}{% endblock %}
 {% block canonical %}{{ base_url(request) }}/apps/{{ app.app_id }}{% endblock %}
-{% block ogimage %}{{ app.icon_url or (base_url(request) ~ '/static/og-image.png') }}{% endblock %}
+{% block ogimage %}{% if not app.icon_url %}{{ base_url(request) ~ '/static/og-image.png' }}
+{%- elif STATIC_BUILD %}{{ app.icon_url }}
+{%- else %}{{ base_url(request) ~ '/icon/' ~ app.app_id }}{% endif %}{% endblock %}
 {% block head %}
 <script type="application/ld+json">{{ {
   "@context": "https://schema.org", "@type": "SoftwareApplication", "name": app.name,

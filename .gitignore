@@ -18,6 +18,7 @@ server/.env
 *.sqlite3
 server/data/
 .crawl-cache/
+.icon-cache/
 
 # Scratch (previews, local test builds)
 .servetest/

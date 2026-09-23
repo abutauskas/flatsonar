@@ -16,7 +16,7 @@ COPY core /app/core
 COPY server /app/server
 RUN pip install -e /app/core -e "/app/server[postgres]"
 
-ENV PORT=8000 DATABASE_URL=sqlite:////data/flatsonar.db CRAWL_CACHE_DIR=/data/crawl-cache
+ENV PORT=8000 DATABASE_URL=sqlite:////data/flatsonar.db CRAWL_CACHE_DIR=/data/crawl-cache ICON_CACHE_DIR=/data/icon-cache
 RUN mkdir -p /data
 VOLUME ["/data"]
 EXPOSE 8000

@@ -14,10 +14,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .api.apps import router as apps_router
 from .db import init_db
 from .settings import settings
+from .web.icon_proxy import router as icon_router
 from .web.routes import STATIC_DIR, render_404
 from .web.routes import router as web_router
 
-_MACHINE_PREFIXES = ("/api", "/static", "/docs", "/redoc", "/openapi.json")
+_MACHINE_PREFIXES = ("/api", "/static", "/icon", "/docs", "/redoc", "/openapi.json")
 # /health too: Render's own health checks hit the app on its internal onrender.com
 # address, never on the custom domain, so that path must never be redirected either.
 _NO_HOST_REDIRECT = _MACHINE_PREFIXES + ("/health",)
@@ -90,6 +91,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(CanonicalHostMiddleware)
 app.include_router(apps_router)
 app.include_router(web_router)
+app.include_router(icon_router)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 

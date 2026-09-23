@@ -38,6 +38,7 @@ class Settings(BaseSettings):
         "https://store.puri.sm/repo/stable/pureos.flatpakrepo"
     )
     crawl_cache_dir: Path = _SERVER_DIR / ".crawl-cache"
+    icon_cache_dir: Path = _SERVER_DIR / ".icon-cache"
     cors_origins: str = "*"
     site_url: str | None = None  # public origin for sitemap/feed links, e.g. https://flatsonar.org
     user_agent: str = "Flatsonar/0.1 (+https://github.com/abutauskas/flatsonar)"

@@ -1,5 +1,8 @@
 {% macro icon(app, size=56) -%}
-<img class="icon" src="{{ app.icon_url or '/static/app-fallback.svg' }}" width="{{ size }}" height="{{ size }}" alt=""
+{% if not app.icon_url %}{% set src = '/static/app-fallback.svg' %}
+{% elif STATIC_BUILD %}{% set src = app.icon_url %}{# no server on GitHub Pages to proxy through #}
+{% else %}{% set src = '/icon/' ~ app.app_id %}{% endif %}
+<img class="icon" src="{{ src }}" width="{{ size }}" height="{{ size }}" alt=""
      loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/static/app-fallback.svg'">
 {%- endmacro %}
 
