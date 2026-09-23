@@ -228,7 +228,7 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 
 /* --- catalogue -------------------------------------------------------------------- */
 
-.catalogue { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 36px; padding: 32px 20px 64px; align-items: start; }
+.catalogue { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 36px; padding: 32px 20px 64px; align-items: start; max-width: none; }
 .results { min-width: 0; }
 .side { position: sticky; top: 84px; }
 .side h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 10px; }
