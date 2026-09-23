@@ -207,23 +207,23 @@ select { padding-right: 34px; appearance: none; -webkit-appearance: none;
 .app-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); text-decoration: none; }
 .app-card .icon { width: 56px; height: 56px; border-radius: 14px; flex: none; background: var(--surface-2); object-fit: contain; }
 .app-card .meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.app-card .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-card .name { display: flex; align-items: center; gap: 4px; min-width: 0; font-weight: 600; }
+.app-card .name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .app-card .dev { color: var(--muted); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-card .summary { color: var(--muted); font-size: .9rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.app-card .pills { margin-top: 8px; align-items: center; }
 .app-card[hidden] { display: none; }  /* [hidden] alone loses to the display:flex above */
 
-/* A small badge icon riding the corner of an app icon: how verified/reviewed/suspicious
-   read at a glance, instead of another colored pill in an already busy card. */
-.icon-wrap { position: relative; flex: none; display: inline-flex; }
+/* A small badge icon: how verified/reviewed/suspicious read at a glance, instead of
+   another colored pill. Inline next to the name on cards; riding the icon's corner
+   on the app page, where there's room for it. */
+.icon-wrap { position: relative; flex: none; display: inline-flex; align-self: flex-start; }
 .trust-corner { position: absolute; right: -3px; bottom: -3px; border-radius: 50%; background: var(--surface); box-shadow: 0 0 0 2px var(--surface); }
+.trust-inline { flex: none; }
 .trust-badge { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; font-weight: 600; }
 .trust-badge img { width: 16px; height: 16px; flex: none; }
 .trust-badge.verified { color: var(--accent-ink); }
 .trust-badge.reviewed { color: var(--blue); }
 .trust-badge.suspicious { color: var(--red); }
-.heart-mark { display: inline-flex; align-items: center; color: var(--pink); flex: none; }
-.heart-mark svg { width: 14px; height: 14px; }
 
 /* --- catalogue -------------------------------------------------------------------- */
 

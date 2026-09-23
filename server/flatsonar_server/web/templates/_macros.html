@@ -15,14 +15,10 @@
 {%- endif %}
 {%- endmacro %}
 
-{% macro trust_corner(level, size=18) -%}
+{% macro trust_corner(level, size=18, cls='trust-corner') -%}
 {% if TRUST_BADGE_ICON.get(level) %}
-<img class="trust-corner" src="/static/{{ TRUST_BADGE_ICON[level] }}" width="{{ size }}" height="{{ size }}" alt="{{ TRUST_TEXT.get(level, level) }}" title="{{ TRUST_TIP.get(level, '') }}">
+<img class="{{ cls }}" src="/static/{{ TRUST_BADGE_ICON[level] }}" width="{{ size }}" height="{{ size }}" alt="{{ TRUST_TEXT.get(level, level) }}" title="{{ TRUST_TIP.get(level, '') }}">
 {%- endif %}
-{%- endmacro %}
-
-{% macro heart_mark() -%}
-<span class="heart-mark" title="Has a sponsor link"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg></span>
 {%- endmacro %}
 
 {% macro app_card(app) -%}
@@ -33,18 +29,11 @@
    data-maintenance="{{ app.maintenance }}" data-where="{{ 'flathub' if app.on_flathub else 'hunted' }}"
    data-stars="{{ app.stars or 0 }}" data-updated="{{ app.updated_at|isodate if app.updated_at else '' }}"
    data-created="{{ app.first_seen|isodate if app.first_seen else '' }}">
-  <div class="icon-wrap">
-    {{ icon(app) }}
-    {{ trust_corner(app.trust) }}
-  </div>
+  {{ icon(app) }}
   <div class="meta">
-    <div class="name">{{ app.name }}</div>
+    <div class="name"><span>{{ app.name }}</span>{{ trust_corner(app.trust, 14, 'trust-inline') }}</div>
     {% if app.developer_name %}<div class="dev">by {{ app.developer_name }}{% if app.maintenance == 'abandoned' or app.archived %} · looks abandoned{% elif app.maintenance == 'stale' %} · quiet for a while{% endif %}</div>{% endif %}
     <div class="summary">{{ app.summary }}</div>
-    <div class="pills">
-      {{ risk_pill(app.risk_level) }}
-      {% if app.funding_links %}{{ heart_mark() }}{% endif %}
-    </div>
   </div>
 </a>
 {%- endmacro %}
