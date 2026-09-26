@@ -1,4 +1,4 @@
-from flatsonar.text import funding_label, nicedate, paragraphs
+from flatsonar.text import funding_label, name_sort_key, nicedate, paragraphs
 
 
 def test_paragraphs_join_hard_wrapped_lines_and_keep_bullets():
@@ -18,3 +18,8 @@ def test_nicedate():
     assert nicedate("2024-03-05T12:00:00+00:00", "%b %Y") == "Mar 2024"
     assert nicedate("not a date") == "not a date"
     assert nicedate(None) == ""
+
+
+def test_name_sort_key_puts_punctuation_names_after_z():
+    names = ["Zed", "@APP_NAME@", "-", "abacus", "2048", "Beta", ""]
+    assert sorted(names, key=name_sort_key) == ["2048", "abacus", "Beta", "Zed", "", "-", "@APP_NAME@"]

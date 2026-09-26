@@ -3,23 +3,32 @@ both list, filter and count exactly the same apps."""
 
 from __future__ import annotations
 
+import string
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from flatsonar_core import MaintenanceLevel, TrustLevel
 from sqlalchemy import String, case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql import Select
 
-from flatsonar_core import MaintenanceLevel, TrustLevel
-
 from .models import App, CrawlRun, InstallSource, SourceKind
 
+# Names that start with punctuation or whitespace ("-", unexpanded build templates such
+# as "@APP_NAME@") sink to the end of the A-Z list instead of heading it. Everything
+# else sorts case-insensitively: digits, then letters, then other scripts.
+NAME_LAST_CHARS = tuple(string.punctuation + string.whitespace)
+_name_last = case((App.name.is_(None) | (App.name == "") | func.substr(App.name, 1, 1).in_(NAME_LAST_CHARS), 1),
+                  else_=0)
+# app_id last in every order: without a unique tie-break, apps with equal keys (two
+# "2048"s, hundreds of 0-star repos) can shuffle between queries, so paging could
+# show one twice and skip another.
 SORTS = {
-    "name": App.name.asc(),
-    "stars": App.stars.desc(),
-    "updated": App.updated_at.desc(),
-    "newest": App.first_seen.desc(),
+    "name": (_name_last, func.lower(App.name), App.name, App.app_id),
+    "stars": (App.stars.desc(), App.app_id),
+    "updated": (App.updated_at.desc(), App.app_id),
+    "newest": (App.first_seen.desc(), App.app_id),
 }
 TRUSTS = tuple(level.label for level in TrustLevel)
 MAINTENANCE_LEVELS = tuple(level.label for level in MaintenanceLevel)
@@ -123,7 +132,7 @@ def page_apps(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     # "name" is the default sort, not something anyone picks *for a search* - once there's
     # a query, relevance beats alphabetical unless the user explicitly asked for stars/date.
-    order = (_relevance(q).desc(), App.stars.desc()) if q and sort == "name" else (SORTS[sort],)
+    order = (_relevance(q).desc(), App.stars.desc(), App.app_id) if q and sort == "name" else SORTS[sort]
     rows = db.scalars(stmt.order_by(*order).offset((page - 1) * per_page).limit(per_page)).all()
     return list(rows), total
 

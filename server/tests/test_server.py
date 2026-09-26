@@ -122,6 +122,25 @@ def test_api_list_search_detail(client, session):
         "--socket=wayland", "--share=network"]
 
 
+def test_name_sort_is_a_to_z_with_punctuation_names_last(client, session):
+    """Unexpanded build templates ("@APP_NAME@") and "-" used to head the catalogue."""
+    names = {"org.x.Zed": "Zed", "org.x.Tmpl": "@APP_NAME@", "org.x.Dash": "-", "org.x.Abacus": "abacus",
+             "org.x.Game": "2048", "org.x.Beta": "Beta", "org.x.Game2": "2048"}
+    for app_id, name in names.items():
+        upsert_candidate(session, _flathub_candidate(app_id, name=name))
+    session.commit()
+
+    items = client.get("/api/apps?sort=name").json()["items"]
+    assert [i["name"] for i in items[:5]] == ["2048", "2048", "abacus", "Beta", "Zed"]  # case-insensitive
+    assert {i["name"] for i in items[5:]} == {"-", "@APP_NAME@"}
+    assert [i["app_id"] for i in items[:2]] == ["org.x.Game", "org.x.Game2"]  # ties broken by id
+
+    # Paging walks the same order: every app exactly once.
+    paged = [i["app_id"] for p in (1, 2, 3, 4)
+             for i in client.get(f"/api/apps?sort=name&per_page=2&page={p}").json()["items"]]
+    assert paged == [i["app_id"] for i in items]
+
+
 # --- helpers ----------------------------------------------------------------------
 
 

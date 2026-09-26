@@ -197,8 +197,16 @@ document.addEventListener('keydown', function (e) {
     return score;
   }
 
+  // Same rule as catalogue.SORTS on the server: names starting with punctuation or
+  // whitespace ("-", unexpanded "@APP_NAME@" templates) go after Z, not before A.
+  function nameLast(name) { return !name || /^[\s!-\/:-@\[-`{-~]/.test(name) ? 1 : 0; }
+
   var SORTERS = {
-    name: function (a, b) { return a.dataset.name.localeCompare(b.dataset.name); },
+    name: function (a, b) {
+      return nameLast(a.dataset.name) - nameLast(b.dataset.name) ||
+        a.dataset.name.localeCompare(b.dataset.name, undefined, { sensitivity: 'base' }) ||
+        a.dataset.id.localeCompare(b.dataset.id);
+    },
     stars: function (a, b) { return (+b.dataset.stars || 0) - (+a.dataset.stars || 0); },
     updated: function (a, b) { return (Date.parse(b.dataset.updated) || 0) - (Date.parse(a.dataset.updated) || 0); },
     newest: function (a, b) { return (Date.parse(b.dataset.created) || 0) - (Date.parse(a.dataset.created) || 0); },

@@ -19,6 +19,7 @@ from ..asyncjob import run_async
 from ..icons import load_into
 from ..install import flatpak_cli as fp
 from ..install.flatpak_cli import InstalledApp
+from ..text import name_sort_key
 from ..widgets import RadarMark, risk_pill
 
 log = logging.getLogger("flatsonar.installed")
@@ -85,7 +86,7 @@ def load_entries(installed: dict[str, InstalledApp], updates: set[str], api) -> 
     for e in entries:
         e.info = infos.get(e.installed.app_id)
         e.update = e.installed.app_id in updates
-    return sorted(entries, key=lambda e: e.name.lower())
+    return sorted(entries, key=lambda e: name_sort_key(e.name))
 
 
 class InstalledPage(Adw.NavigationPage):

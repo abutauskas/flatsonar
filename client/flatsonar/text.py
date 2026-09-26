@@ -5,6 +5,7 @@ anywhere. Labels and tooltips follow the website's
 from __future__ import annotations
 
 import re
+import string
 from datetime import datetime
 
 RISK_TEXT = {"green": "Sandboxed", "yellow": "Broad permissions", "red": "Extensive permissions"}
@@ -85,6 +86,17 @@ def nicedate(iso: str | None, fmt: str = "%b %d, %Y") -> str:
     except ValueError:
         return iso[:10]
     return d.strftime(fmt).replace(" 0", " ")
+
+
+_NAME_LAST = frozenset(string.punctuation + string.whitespace)
+
+
+def name_sort_key(name: str | None) -> tuple[bool, str]:
+    """A-Z ignoring case, with names that start with punctuation or whitespace ("-",
+    unexpanded "@APP_NAME@" templates) after Z: the catalogue's order (server
+    catalogue.SORTS), for lists the client sorts itself."""
+    name = name or ""
+    return (not name or name[0] in _NAME_LAST, name.casefold())
 
 
 def grouped(n: int) -> str:
