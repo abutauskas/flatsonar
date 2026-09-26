@@ -77,12 +77,13 @@
 
     <section id="get">
       <h2>Get the app</h2>
-      <p>The desktop client is a GTK4 / libadwaita app for Linux. It is early: today it runs from source.</p>
-      <div class="cmd" data-copy><code>git clone {{ site.repo }}.git &amp;&amp; cd flatsonar
-./scripts/setup-wsl.sh            # GTK4, libadwaita, flatpak, clamav (Debian/Ubuntu)
-pip install --user -e core -e client
-FLATSONAR_API={{ base_url(request) }} python -m flatsonar</code><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+      <p>The desktop client is a GTK4 / libadwaita app for Linux, shipped as a Flatpak bundle. It has the same catalogue and app pages as this site, and installs through the two-gate check above.</p>
+      <p><a class="btn primary" href="{{ site.repo }}/releases/latest/download/flatsonar.flatpak">Download {{ site.name }} {{ site.version }}</a></p>
+      <div class="cmd" data-copy><code>flatpak install --user ./flatsonar.flatpak
+flatpak run io.github.abutauskas.Flatsonar</code><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+      <p>The file scan runs your system's ClamAV on the unpacked download, which needs <code>ostree</code> too (on Debian/Ubuntu: <code>sudo apt install clamav ostree</code>). Without them the real permissions are still checked, but the files are not scanned.</p>
       <p>Press <kbd>Ctrl</kbd>+<kbd>I</kbd> for the Installed page: every Flatpak on the machine, user and system, scored from its deployed permissions (whether or not {{ site.name }} installed it), with Update wherever something newer exists.</p>
+      <p class="fine">Or run it from source: see the <a href="{{ site.repo }}#client-linux--wsl2" rel="noopener">README</a>.</p>
     </section>
 
     <section id="developers">

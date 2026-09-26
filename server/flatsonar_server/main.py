@@ -78,7 +78,7 @@ class CanonicalHostMiddleware(BaseHTTPMiddleware):
 app = FastAPI(
     title="Flatsonar",
     description="Open-source Flatpak apps, hunted from everywhere. Credits creators, flags risky sandboxes.",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=_lifespan,
 )
 app.add_middleware(

@@ -47,7 +47,7 @@
     </form>
     <div class="cta">
       <a class="btn ghost" href="/apps">Browse the catalogue</a>
-      <a class="btn ghost" href="/about#get">Get the desktop app</a>
+      <a class="btn ghost" href="#get">Get the desktop app</a>
     </div>
   </div>
 </section>
@@ -165,12 +165,11 @@
     <div>
       <h2>Get {{ site.name }}</h2>
       <p class="sub">A GTK4 desktop app for Linux that installs through the two-gate check (pull, unpack, scan, re-score, ask twice, deploy) and shows you what is already installed with the same scoring.</p>
-      <p class="fine">Early days: it runs from source today. A Flatpak of {{ site.name }} itself is coming (and scores <strong>red</strong> by its own rules: a store has to talk to <code>org.freedesktop.Flatpak</code>).</p>
+      <p><a class="btn primary" href="{{ site.repo }}/releases/latest/download/flatsonar.flatpak">Download {{ site.name }} {{ site.version }}</a></p>
+      <p class="fine">A Flatpak bundle for x86_64; its GNOME runtime comes from Flathub on install. It scores <strong>red</strong> by its own rules: a store has to talk to <code>org.freedesktop.Flatpak</code>. <a href="{{ site.repo }}/releases/latest" rel="noopener">Release notes</a></p>
     </div>
-    <div class="cmd" data-copy><code>git clone {{ site.repo }}.git &amp;&amp; cd flatsonar
-./scripts/setup-wsl.sh            # GTK4, libadwaita, flatpak, clamav
-pip install --user -e core -e client
-python -m flatsonar</code><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+    <div class="cmd" data-copy><code>flatpak install --user ./flatsonar.flatpak
+flatpak run io.github.abutauskas.Flatsonar</code><button class="copy" type="button" aria-label="Copy">Copy</button></div>
   </div>
 </section>
 {% endblock %}

@@ -17,8 +17,16 @@ Browse the catalogue at **[flatsonar.org](https://flatsonar.org)**, or install t
 client from the [latest release](https://github.com/abutauskas/flatsonar/releases/latest):
 
 ```sh
-flatpak install flatsonar.flatpak
+curl -LO https://github.com/abutauskas/flatsonar/releases/latest/download/flatsonar.flatpak
+flatpak install --user ./flatsonar.flatpak
+flatpak run io.github.abutauskas.Flatsonar
 ```
+
+The bundle is x86_64; its GNOME runtime comes from Flathub on install. The desktop client
+has the same catalogue and app pages as the website (light and dark), plus installing,
+updating and the Installed page. The file scan runs the system's ClamAV on the unpacked
+download, which needs `ostree` too (`sudo apt install clamav ostree` on Debian/Ubuntu);
+without them the real permissions are still checked, but the files are not scanned.
 
 It talks to the hosted API at `https://flatsonar.onrender.com` by default - no server setup
 needed. (That server is on a free instance that spins down when idle, so the first request
@@ -60,6 +68,20 @@ On Windows the server can stay on the Windows side; WSL2 reaches it at
 `http://localhost:8000` automatically. Flatpak works inside WSL2 for development
 (GUI apps show up through WSLg), but test on a real Linux install before trusting
 anything sandbox-related.
+
+### Building the Flatpak
+
+```sh
+cd client
+flatpak-builder --user --install --force-clean --repo=repo build-dir io.github.abutauskas.Flatsonar.json
+flatpak build-bundle repo flatsonar.flatpak io.github.abutauskas.Flatsonar \
+  --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+```
+
+`--install` puts the build on this machine; `flatsonar.flatpak` is the single-file bundle
+attached to releases. Inside the sandbox the client reaches the host's `flatpak`, `ostree` and
+ClamAV through `flatpak-spawn --host`, and reads installed apps' metadata through the
+manifest's read-only `xdg-data/flatpak/app` and `/var/lib/flatpak/app` grants.
 
 ### Previewing the client on Windows
 
