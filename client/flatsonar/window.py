@@ -1,10 +1,11 @@
-"""Main window: category sidebar, search, app grid, and navigation into app pages."""
+"""Main window, laid out like the website's catalogue: categories on the left; search,
+filters, the result count, a grid of app cards and Previous/Next paging on the right."""
 
 from __future__ import annotations
 
 import logging
 
-from gi.repository import Adw, Gdk, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
 from .api import DEFAULT_API, AppInfo, FlatsonarAPI, Page
 from .asyncjob import run_async
@@ -14,15 +15,20 @@ from .install.confirm import DialogConfirmer
 from .pages.app_page import AppPage
 from .pages.installed_page import InstalledPage
 from .state import Decisions
-from .widgets import CSS, AppCard
+from .text import grouped
+from .widgets import AppCard, RadarMark, brand, install_style, label, wrap_box
 
 log = logging.getLogger("flatsonar.window")
 
+# Same choices and wording as the website's filter toolbar.
 RISK_FILTERS = [("Any risk", None), ("Sandboxed only", "green"), ("Broad permissions", "yellow"),
-                ("Dangerous", "red")]
+                ("Extensive permissions", "red")]
 TRUST_FILTERS = [("Any publisher", None), ("Verified creators", "verified"),
                  ("Verified or Flathub", "verified,reviewed"), ("Unverified only", "unverified,suspicious")]
+MAINTENANCE_FILTERS = [("Any maintenance", None), ("Actively maintained", "active"),
+                       ("Quiet or abandoned", "stale,abandoned")]
 SORTS = [("Name", "name"), ("Most starred", "stars"), ("Recently updated", "updated"), ("Newest", "newest")]
+PER_PAGE = 36  # the site's page size
 AUTO_REFRESH_SECONDS = 30 * 60  # background re-check cadence; installing is still always manual
 
 
@@ -34,9 +40,17 @@ def _clear(flowbox: Gtk.FlowBox) -> None:
         flowbox.remove(child)
 
 
+def _dropdown(choices: list[tuple[str, str | None]], tip: str) -> Gtk.DropDown:
+    dd = Gtk.DropDown.new_from_strings([t for t, _ in choices])
+    dd.set_tooltip_text(tip)
+    dd.add_css_class("fs-select")
+    return dd
+
+
 class FlatsonarWindow(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, api: FlatsonarAPI):
-        super().__init__(application=app, title="Flatsonar", default_width=1100, default_height=720)
+        super().__init__(application=app, title="Flatsonar", default_width=1280, default_height=820,
+                         width_request=360, height_request=480)
         self.api = api
         self.decisions = Decisions()
         self.confirmer = DialogConfirmer(self)
@@ -46,19 +60,16 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         self._category: str | None = None
         self._risk: str | None = None
         self._trust: str | None = None
+        self._maintenance: str | None = None
         self._sort = "name"
         self._page = 1
+        self._pages_total = 1
         self._search_timer: int | None = None
+        self._quiet = False  # changing several filters at once: one reload at the end, not one each
         self._pages: dict[str, AppPage] = {}
         self.installed_page: InstalledPage | None = None
 
-        css = Gtk.CssProvider()
-        if hasattr(css, "load_from_string"):  # GTK >= 4.12
-            css.load_from_string(CSS)
-        else:
-            css.load_from_data(CSS.encode(), -1)
-        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css,
-                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        install_style(Gdk.Display.get_default())
 
         self.toasts = Adw.ToastOverlay()
         self.set_content(self.toasts)
@@ -74,86 +85,132 @@ class FlatsonarWindow(Adw.ApplicationWindow):
     # --- layout -------------------------------------------------------------------
 
     def _build_browse_page(self) -> Adw.NavigationPage:
-        split = Adw.NavigationSplitView(min_sidebar_width=200, max_sidebar_width=260)
+        # show_content: when collapsed (narrow window), open on the apps, not the categories.
+        self.split = Adw.NavigationSplitView(min_sidebar_width=220, max_sidebar_width=270, show_content=True)
 
-        # Sidebar: categories.
+        # Sidebar: the brand, then categories.
         side_tb = Adw.ToolbarView()
-        side_tb.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Flatsonar")))
+        side_header = Adw.HeaderBar(show_title=False)
+        side_header.pack_start(brand(28))
+        side_tb.add_top_bar(side_header)
+        side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin_top=14, margin_bottom=24)
+        side.append(label("CATEGORIES", "fs-kicker", margin_start=20))
         self.category_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
-        self.category_list.add_css_class("navigation-sidebar")
+        self.category_list.add_css_class("fs-cats")
         self.category_list.connect("row-selected", self._on_category_selected)
+        # Collapsed (narrow window): picking a category goes back to the results.
+        self.category_list.connect("row-activated", lambda *_: self.split.set_show_content(True))
+        side.append(self.category_list)
         side_scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
-        side_scroller.set_child(self.category_list)
+        side_scroller.set_child(side)
         side_tb.set_content(side_scroller)
-        split.set_sidebar(Adw.NavigationPage(title="Categories", child=side_tb))
+        self.split.set_sidebar(Adw.NavigationPage(title="Categories", child=side_tb))
 
-        # Content: search + filters + grid.
+        # Content: header, then search + filters, count, grid, pager.
         content_tb = Adw.ToolbarView()
-        header = Adw.HeaderBar()
-        self.search = Gtk.SearchEntry(placeholder_text="Search apps", hexpand=True, width_chars=32)
-        self.search.connect("search-changed", self._on_search_changed)
-        header.set_title_widget(self.search)
-
-        self.installed_btn = Gtk.Button(tooltip_text="Installed apps and updates")
-        self.installed_btn_content = Adw.ButtonContent(icon_name="emblem-ok-symbolic", label="Installed")
-        self.installed_btn.set_child(self.installed_btn_content)
-        self.installed_btn.connect("clicked", lambda _b: self.show_installed())
-        header.pack_start(self.installed_btn)
-
+        header = Adw.HeaderBar(show_title=False)
         menu_btn = Gtk.MenuButton(icon_name="open-menu-symbolic", tooltip_text="Menu")
         menu_btn.set_menu_model(self._app_menu())
         header.pack_end(menu_btn)
-
-        self.risk_dd = Gtk.DropDown.new_from_strings([t for t, _ in RISK_FILTERS])
-        self.risk_dd.set_tooltip_text("Filter by sandbox risk")
-        self.risk_dd.connect("notify::selected", self._on_filter_changed)
-        header.pack_end(self.risk_dd)
-        self.trust_dd = Gtk.DropDown.new_from_strings([t for t, _ in TRUST_FILTERS])
-        self.trust_dd.set_tooltip_text("Filter by publisher trust")
-        self.trust_dd.connect("notify::selected", self._on_filter_changed)
-        header.pack_end(self.trust_dd)
-        self.sort_dd = Gtk.DropDown.new_from_strings([t for t, _ in SORTS])
-        self.sort_dd.set_tooltip_text("Sort")
-        self.sort_dd.connect("notify::selected", self._on_filter_changed)
-        header.pack_end(self.sort_dd)
+        self.installed_btn = Gtk.Button(label="Installed", tooltip_text="Installed apps and updates (Ctrl+I)")
+        self.installed_btn.add_css_class("fs-nav")
+        self.installed_btn.connect("clicked", lambda _b: self.show_installed())
+        header.pack_end(self.installed_btn)
         content_tb.add_top_bar(header)
 
-        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
-        self.grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
-                                column_spacing=6, row_spacing=6, valign=Gtk.Align.START,
-                                margin_top=12, margin_bottom=12, margin_start=12, margin_end=12,
-                                max_children_per_line=8, min_children_per_line=2)
-        grid_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        grid_box.append(self.grid)
-        self.more_btn = Gtk.Button(label="Load more", halign=Gtk.Align.CENTER, margin_bottom=24, visible=False)
-        self.more_btn.add_css_class("pill")
-        self.more_btn.connect("clicked", lambda _b: self.reload(append=True))
-        grid_box.append(self.more_btn)
-        grid_scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
-        grid_scroller.set_child(grid_box)
-        self.stack.add_named(grid_scroller, "grid")
-        self.stack.add_named(Adw.StatusPage(icon_name="edit-find-symbolic", title="No apps found",
-                                            description="Try another search or category."), "empty")
-        self.offline_page = Adw.StatusPage(icon_name="network-offline-symbolic",
-                                           title="Can't reach the Flatsonar server")
-        self.stack.add_named(self.offline_page, "offline")
-        self.loading_page = Adw.StatusPage(title="Loading…", description=self._cold_start_hint())
-        spinner = Gtk.Spinner(spinning=True, width_request=32, height_request=32)
-        self.loading_page.set_child(spinner)
-        self.stack.add_named(self.loading_page, "loading")
-        content_tb.set_content(self.stack)
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, margin_top=8, margin_bottom=40,
+                       margin_start=28, margin_end=28)
 
-        self.status = Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END)
-        self.status.add_css_class("dim-label")
-        self.status.add_css_class("status-bar")
-        content_tb.add_bottom_bar(self.status)
+        self.toolbar = Gtk.Box(spacing=10)
+        self.search = Gtk.SearchEntry(placeholder_text="Search name, summary, id, developer…", hexpand=True)
+        self.search.add_css_class("fs-search")
+        self.search.connect("search-changed", self._on_search_changed)
+        self.toolbar.append(self.search)
+        self.risk_dd = _dropdown(RISK_FILTERS, "Sandbox risk")
+        self.trust_dd = _dropdown(TRUST_FILTERS, "Publisher trust")
+        self.maint_dd = _dropdown(MAINTENANCE_FILTERS, "Maintenance")
+        self.sort_dd = _dropdown(SORTS, "Sort")
+        filters = wrap_box(10)
+        for dd in (self.risk_dd, self.trust_dd, self.maint_dd, self.sort_dd):
+            dd.connect("notify::selected", self._on_filter_changed)
+            filters.append(dd)
+        self.toolbar.append(filters)
+        body.append(self.toolbar)
 
-        split.set_content(Adw.NavigationPage(title="Apps", child=content_tb))
-        return Adw.NavigationPage(title="Browse", tag="browse", child=split)
+        self.searching = Gtk.Box(spacing=10, halign=Gtk.Align.CENTER, margin_top=8, visible=False)
+        self.searching.append(RadarMark(28, spinning=True))
+        self.searching.append(label("Searching…", "fs-muted"))
+        body.append(self.searching)
+
+        count_row = Gtk.Box(spacing=6)
+        self.count = label("", "fs-count", ellipsize=Pango.EllipsizeMode.END)
+        count_row.append(self.count)
+        self.clear_btn = Gtk.Button(label="clear filters", has_frame=False, visible=False)
+        self.clear_btn.add_css_class("fs-link")
+        self.clear_btn.connect("clicked", lambda _b: self.clear_filters())
+        count_row.append(self.clear_btn)
+        body.append(count_row)
+
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE, vhomogeneous=False)
+        self.grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True, column_spacing=20,
+                                row_spacing=20, valign=Gtk.Align.START, min_children_per_line=1,
+                                max_children_per_line=3)
+        self.grid.add_css_class("fs-grid")
+        self.stack.add_named(self.grid, "grid")
+        self.stack.add_named(self._notice("No apps found",
+                                          "Try another search or loosen the filters. The hunt is ongoing: new "
+                                          "finds show up here as they are crawled."), "empty")
+        self.offline_notice = self._notice("Can't reach the Flatsonar server", "", retry=True)
+        self.stack.add_named(self.offline_notice, "offline")
+        loading = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, margin_top=80)
+        loading.append(RadarMark(64, spinning=True))
+        loading.append(label("Hunting for apps…", "fs-h3", xalign=0.5))
+        hint = self._cold_start_hint()
+        if hint:
+            loading.append(label(hint, "fs-muted", xalign=0.5, wrap=True, justify=Gtk.Justification.CENTER))
+        self.stack.add_named(loading, "loading")
+        body.append(self.stack)
+
+        self.pager = Gtk.Box(spacing=10, halign=Gtk.Align.CENTER, margin_top=22, visible=False)
+        self.prev_btn = Gtk.Button(label="← Previous")
+        self.next_btn = Gtk.Button(label="Next →")
+        self.where = label("", "fs-muted", xalign=0.5)
+        for w in (self.prev_btn, self.where, self.next_btn):
+            self.pager.append(w)
+        for b, step in ((self.prev_btn, -1), (self.next_btn, 1)):
+            b.add_css_class("fs-pager")
+            b.connect("clicked", lambda _b, s=step: self.goto_page(self._page + s))
+        body.append(self.pager)
+
+        self.scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
+        self.scroller.set_child(body)
+        content_tb.set_content(self.scroller)
+        self.search.set_key_capture_widget(content_tb)
+        self.split.set_content(Adw.NavigationPage(title="Apps", child=content_tb))
+
+        # Narrower windows: filters under the search box, then categories behind a back button.
+        for condition, collapse in (("max-width: 1180sp", False), ("max-width: 720sp", True)):
+            bp = Adw.Breakpoint.new(Adw.BreakpointCondition.parse(condition))
+            bp.add_setter(self.toolbar, "orientation", Gtk.Orientation.VERTICAL)
+            if collapse:
+                bp.add_setter(self.split, "collapsed", GObject.Value(GObject.TYPE_BOOLEAN, True))
+            self.add_breakpoint(bp)
+        return Adw.NavigationPage(title="Browse", tag="browse", child=self.split)
+
+    def _notice(self, title: str, text: str, retry: bool = False) -> Gtk.Box:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.add_css_class("fs-empty")
+        box.append(label(title, "fs-h3", xalign=0.5))
+        box.text = label(text, "fs-muted", xalign=0.5, wrap=True, justify=Gtk.Justification.CENTER)  # type: ignore[attr-defined]
+        box.append(box.text)  # type: ignore[attr-defined]
+        if retry:
+            again = Gtk.Button(label="Try again", halign=Gtk.Align.CENTER, margin_top=8)
+            again.add_css_class("pill")
+            again.connect("clicked", lambda _b: (self.load_categories(), self.reload()))
+            box.append(again)
+        return box
 
     def _app_menu(self):
-        from gi.repository import Gio
-
         menu = Gio.Menu()
         menu.append("Installed apps", "app.installed")
         menu.append("Refresh", "app.refresh")
@@ -165,24 +222,25 @@ class FlatsonarWindow(Adw.ApplicationWindow):
 
     def load_categories(self) -> None:
         def _done(cats):
+            self._quiet = True  # removing the selected row reports "no category" on its way out
             while (row := self.category_list.get_row_at_index(0)) is not None:
                 self.category_list.remove(row)
-            self.category_list.append(self._cat_row("All apps", None, None))
-            for name, count in cats:
-                self.category_list.append(self._cat_row(name, name, count))
-            self.category_list.select_row(self.category_list.get_row_at_index(0))
+            for text, value, count in [("All apps", None, None), *((n, n, c) for n, c in cats)]:
+                row = self._cat_row(text, value, count)
+                self.category_list.append(row)
+                if value == self._category:
+                    self.category_list.select_row(row)
+            self._quiet = False
 
         run_async(self.api.categories, _done, lambda e: None)
 
-    def _cat_row(self, label: str, value: str | None, count: int | None) -> Gtk.ListBoxRow:
+    def _cat_row(self, text: str, value: str | None, count: int | None) -> Gtk.ListBoxRow:
         row = Gtk.ListBoxRow()
         row.category = value  # type: ignore[attr-defined]
-        box = Gtk.Box(spacing=8, margin_top=4, margin_bottom=4)
-        box.append(Gtk.Label(label=label, xalign=0, hexpand=True))
+        box = Gtk.Box(spacing=10)
+        box.append(label(text, "fs-cat-name", hexpand=True, ellipsize=Pango.EllipsizeMode.END))
         if count is not None:
-            c = Gtk.Label(label=str(count))
-            c.add_css_class("dim-label")
-            box.append(c)
+            box.append(label(str(count), "fs-muted"))
         row.set_child(box)
         return row
 
@@ -191,7 +249,7 @@ class FlatsonarWindow(Adw.ApplicationWindow):
 
     def _cold_start_hint(self) -> str:
         if self._on_default_server():
-            return "The hosted server spins down when idle, so this can take up to a minute."
+            return "The hosted server spins down when idle, so the first load can take up to a minute."
         return ""
 
     def _offline_description(self) -> str:
@@ -200,39 +258,79 @@ class FlatsonarWindow(Adw.ApplicationWindow):
                     "take a minute to wake up after being idle - try again shortly.")
         return f"Is it running at {self.api.base}?"
 
-    def reload(self, append: bool = False) -> None:
-        if not append:
+    def _filters(self) -> tuple:
+        return self._query, self._category, self._risk, self._trust, self._maintenance, self._sort
+
+    def goto_page(self, page: int) -> None:
+        if 1 <= page <= self._pages_total and page != self._page:
+            self._page = page
+            self.scroller.get_vadjustment().set_value(0)  # to the top now, where the loader shows
+            self.reload(keep_page=True)
+
+    def clear_filters(self) -> None:
+        self._quiet = True
+        self._query = ""
+        self.search.set_text("")
+        for dd in (self.risk_dd, self.trust_dd, self.maint_dd):
+            dd.set_selected(0)
+        self._category = None
+        self.category_list.select_row(self.category_list.get_row_at_index(0))
+        self._quiet = False
+        self._on_filter_changed()
+
+    def reload(self, keep_page: bool = False) -> None:
+        if not keep_page:
             self._page = 1
+        if self.grid.get_first_child() is None or self.stack.get_visible_child_name() != "grid":
             self.stack.set_visible_child_name("loading")
-        else:
-            self._page += 1
-            self.more_btn.set_sensitive(False)
+        else:  # the site's "is-loading": keep the old results, dimmed, under the radar
+            self.grid.add_css_class("fs-dim")
+            self.searching.set_visible(True)
+        self.prev_btn.set_sensitive(False)
+        self.next_btn.set_sensitive(False)
 
         page_no = self._page
-        q, cat, risk, trust, sort = self._query, self._category, self._risk, self._trust, self._sort
+        filters = self._filters()
+        q, cat, risk, trust, maintenance, sort = filters
 
         def _done(page: Page):
-            if (q, cat, risk, trust, sort) != (self._query, self._category, self._risk, self._trust, self._sort):
+            if filters != self._filters() or page_no != self._page:
                 return  # stale
-            if not append:
-                _clear(self.grid)
+            self.grid.remove_css_class("fs-dim")
+            self.searching.set_visible(False)
+            _clear(self.grid)
             for app in page.items:
                 card = AppCard(app)
-                card.connect("clicked", lambda b: self.open_app(b.app.app_id))
+                card.connect("clicked", lambda b: self.open_app(b.app.app_id, b.app))
                 self.grid.append(card)
-            self.more_btn.set_visible(page.has_more)
-            self.more_btn.set_sensitive(True)
             self.stack.set_visible_child_name("grid" if page.total else "empty")
-            self.status.set_text(f"{page.total} apps" + (f" matching “{q}”" if q else "")
-                                 + (f" in {cat}" if cat else ""))
+            self._pages_total = max(1, -(-page.total // page.per_page))
+            text = f"{grouped(page.total)} app{'' if page.total == 1 else 's'}"
+            if q:
+                text += f" matching “{q}”"
+            if cat:
+                text += f" in {cat}"
+            self.count.set_text(text)
+            self.clear_btn.set_visible(any((q, cat, risk, trust, maintenance)))
+            self.pager.set_visible(self._pages_total > 1)
+            self.where.set_text(f"Page {page_no} of {grouped(self._pages_total)}")
+            self.prev_btn.set_sensitive(page_no > 1)
+            self.next_btn.set_sensitive(page_no < self._pages_total)
+            self.scroller.get_vadjustment().set_value(0)
 
         def _err(exc):
             log.warning("list failed: %s", exc)
-            self.offline_page.set_description(self._offline_description())
+            if filters != self._filters() or page_no != self._page:
+                return
+            self.grid.remove_css_class("fs-dim")
+            self.searching.set_visible(False)
+            self.offline_notice.text.set_text(self._offline_description())
             self.stack.set_visible_child_name("offline")
+            self.pager.set_visible(False)
+            self.count.set_text("")
 
-        run_async(lambda: self.api.list_apps(q=q, category=cat, risk=risk, trust=trust, sort=sort, page=page_no),
-                  _done, _err)
+        run_async(lambda: self.api.list_apps(q=q, category=cat, risk=risk, trust=trust, maintenance=maintenance,
+                                             sort=sort, page=page_no, per_page=PER_PAGE), _done, _err)
 
     def refresh_installed(self, announce: bool = False) -> None:
         """Two steps: the local list is instant, asking the remotes for updates is not.
@@ -282,8 +380,8 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         for page in self._pages.values():
             page.set_installed(self.installed.get(page.app.app_id), self.update_available(page.app))
         n = len(self.updates)
-        self.installed_btn_content.set_label(f"{n} update{'s' if n != 1 else ''}" if n else "Installed")
-        self.installed_btn_content.set_icon_name("software-update-available-symbolic" if n else "emblem-ok-symbolic")
+        self.installed_btn.set_label(f"{n} update{'s' if n != 1 else ''}" if n else "Installed")
+        (self.installed_btn.add_css_class if n else self.installed_btn.remove_css_class)("fs-has-updates")
         if self.installed_page is not None:
             self.installed_page.refresh()
 
@@ -295,25 +393,34 @@ class FlatsonarWindow(Adw.ApplicationWindow):
 
         def fire():
             self._search_timer = None
-            self._query = entry.get_text().strip()
-            self.reload()
+            query = entry.get_text().strip()
+            if query != self._query:
+                self._query = query
+                self.reload()
             return False
 
         self._search_timer = GLib.timeout_add(250, fire)
 
     def _on_category_selected(self, _list, row) -> None:
+        if self._quiet:
+            return
         cat = getattr(row, "category", None) if row else None
         if cat != self._category:
             self._category = cat
             self.reload()
 
     def _on_filter_changed(self, *_a) -> None:
+        if self._quiet:
+            return
         self._risk = RISK_FILTERS[self.risk_dd.get_selected()][1]
         self._trust = TRUST_FILTERS[self.trust_dd.get_selected()][1]
+        self._maintenance = MAINTENANCE_FILTERS[self.maint_dd.get_selected()][1]
         self._sort = SORTS[self.sort_dd.get_selected()][1]
         self.reload()
 
-    def open_app(self, app_id: str) -> None:
+    def open_app(self, app_id: str, summary: AppInfo | None = None) -> None:
+        """Push the app's page right away (from ``summary`` when there is one) and fill
+        in the full record when it arrives."""
         if app_id in self._pages:
             page = self._pages[app_id]
             if page.get_parent() is not None:  # already somewhere in the stack
@@ -321,17 +428,38 @@ class FlatsonarWindow(Adw.ApplicationWindow):
             else:
                 self.nav.push(page)
             return
-        self.status.set_text(f"Loading {app_id}…")
+
+        page = None
+        if summary is not None:
+            page = self._new_page(summary, complete=False)
+            self.nav.push(page)
 
         def _done(app: AppInfo):
-            page = AppPage(app, self.installed.get(app.app_id), self.update_available(app),
-                           self.install_app, self.uninstall_app, self.launch_app, self.update_app)
-            self._pages[app.app_id] = page
-            self.nav.push(page)
-            self.status.set_text("")
+            nonlocal page
+            if page is None:
+                page = self._new_page(app, complete=True)
+                self.nav.push(page)
+            else:
+                page.show_details(app)
 
-        run_async(lambda: self.api.get_app(app_id), _done,
-                  lambda e: self.toast(f"Could not load {app_id}: {e}"))
+        def _err(exc):
+            if page is None:
+                self.toast(f"Could not load {app_id}: {exc}")
+            else:
+                page.show_error(str(exc).splitlines()[-1][:200], lambda: self._retry_details(page))
+
+        run_async(lambda: self.api.get_app(app_id), _done, _err)
+
+    def _retry_details(self, page: AppPage) -> None:
+        page.show_loading()
+        run_async(lambda: self.api.get_app(page.app.app_id), page.show_details,
+                  lambda e: page.show_error(str(e).splitlines()[-1][:200], lambda: self._retry_details(page)))
+
+    def _new_page(self, app: AppInfo, complete: bool) -> AppPage:
+        page = AppPage(app, self.installed.get(app.app_id), self.update_available(app),
+                       self.install_app, self.uninstall_app, self.launch_app, self.update_app, complete=complete)
+        self._pages[app.app_id] = page
+        return page
 
     def show_installed(self) -> None:
         if self.installed_page is None:
@@ -357,8 +485,18 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         if self.installed_page is not None:
             self.installed_page.set_busy(app_id, busy)
 
-    def _status_cb(self):
-        return lambda msg: GLib.idle_add(lambda: (self.status.set_text(msg), False)[1])
+    def _status_cb(self, app_id: str):
+        """Worker-thread status for one app, shown on its page and its Installed row."""
+
+        def _show(text: str, fraction: float | None) -> bool:
+            page = self._pages.get(app_id)
+            if page:
+                page.set_progress(text, fraction)
+            if self.installed_page is not None:
+                self.installed_page.set_progress(app_id, text)
+            return False
+
+        return lambda text, fraction=None: GLib.idle_add(_show, text, fraction)
 
     def _run_pipeline(self, app: AppInfo, job, verb: str) -> None:
         """Run an install/update job on a worker thread and report the outcome."""
@@ -366,7 +504,6 @@ class FlatsonarWindow(Adw.ApplicationWindow):
 
         def _done(outcome: pipeline.Outcome):
             self._set_busy(app.app_id, False)
-            self.status.set_text("")
             if outcome.installed:
                 self.toast(outcome.message)
                 self.refresh_installed()
@@ -377,13 +514,12 @@ class FlatsonarWindow(Adw.ApplicationWindow):
 
         def _err(exc: Exception):
             self._set_busy(app.app_id, False)
-            self.status.set_text("")
             self.toast(f"{app.name}: {str(exc).splitlines()[-1][:160]}", timeout=8)
 
         run_async(job, _done, _err)
 
     def install_app(self, app: AppInfo) -> None:
-        status = self._status_cb()
+        status = self._status_cb(app.app_id)
         self._run_pipeline(app, lambda: pipeline.install(app, self.api, self.confirmer, self.decisions, status),
                            "install")
 
@@ -392,7 +528,7 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         if installed is None:
             self.toast(f"{app.name} is not installed.")
             return
-        status = self._status_cb()
+        status = self._status_cb(app.app_id)
         self._run_pipeline(app, lambda: pipeline.update(app, installed, self.api, self.confirmer, self.decisions,
                                                         status), "update")
 
@@ -400,7 +536,6 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         """One worker, apps in sequence; each still gets its own dialogs if it needs them."""
         if not pairs:
             return
-        status = self._status_cb()
         for app, _ in pairs:
             self._set_busy(app.app_id, True)
 
@@ -408,14 +543,14 @@ class FlatsonarWindow(Adw.ApplicationWindow):
             results = []
             for app, inst in pairs:
                 try:
-                    results.append((app, pipeline.update(app, inst, self.api, self.confirmer, self.decisions, status)))
+                    results.append((app, pipeline.update(app, inst, self.api, self.confirmer, self.decisions,
+                                                         self._status_cb(app.app_id))))
                 except Exception as exc:  # keep going with the rest
                     log.exception("update of %s failed", app.app_id)
                     results.append((app, pipeline.Outcome(installed=False, message=str(exc).splitlines()[-1][:160])))
             return results
 
         def _done(results):
-            self.status.set_text("")
             done = [a.name for a, o in results if o.installed]
             skipped = [a.name for a, o in results if o.cancelled]
             failed = [f"{a.name}: {o.message}" for a, o in results if not o.installed and not o.cancelled]
@@ -435,6 +570,7 @@ class FlatsonarWindow(Adw.ApplicationWindow):
         inst = self.installed.get(app.app_id)
         installation = inst.installation if inst else "user"
         self._set_busy(app.app_id, True)
+        self._status_cb(app.app_id)(f"Removing {app.name}…")
 
         def _done(_):
             self._set_busy(app.app_id, False)

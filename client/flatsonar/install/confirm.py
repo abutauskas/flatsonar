@@ -69,6 +69,8 @@ class DialogConfirmer:
             body_bits.append(f"ClamAV flagged {len(scan_result.infected)} file(s) in {app.name}.")
         elif scan_result.ran:
             body_bits.append("ClamAV found nothing, but see below.")
+        elif scan_result.skipped:
+            body_bits.append(f"The files themselves were not scanned: {scan_result.skipped}.")
         else:
             body_bits.append("ClamAV is not installed, so the files themselves were not scanned.")
         body_bits.append("Flatsonar recommends not installing this. You can, but it's your call.")

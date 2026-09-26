@@ -20,6 +20,9 @@ remembered per app until they change.
 Updates go through gate two again (:func:`update`): the new commit is pulled with
 ``--no-deploy``, checked out, scanned and re-scored, and the user is only asked
 when the update *adds* something they have not already accepted.
+
+``status`` callbacks get ``(text, fraction)``: fraction is 0..1 while flatpak reports
+download progress, None for steps that cannot say how far along they are.
 """
 
 from __future__ import annotations
@@ -48,12 +51,20 @@ from ..api import AppInfo, FlatsonarAPI, InstallSource
 from ..state import Decisions
 from . import flatpak_cli as fp
 from .flatpak_cli import InstalledApp
-from .scan import ScanResult, scan
+from .progress import FlatpakProgress
+from .scan import Scanner, ScanResult, clamav_available, scan
 
 log = logging.getLogger("flatsonar.install")
 
 # Anything at or above this level gets the two-step "Sure" flow.
 DOUBLE_CONFIRM_FROM = RiskLevel.YELLOW
+
+Status = Callable[[str, "float | None"], None]
+
+
+def start_scanner() -> Scanner | None:
+    """ClamAV, warming up while the download runs (see :class:`scan.Scanner`)."""
+    return Scanner()
 
 
 class Confirmer(Protocol):
@@ -163,12 +174,28 @@ class _Prepared:
         self.bundle_path: Path | None = None
         self.local_repo: Path | None = None
         self.ref: str | None = None
+        self.scanner: Scanner | None = None
 
 
-def _status(cb: Callable[[str], None] | None, msg: str) -> None:
+def _status(cb: Status | None, msg: str, fraction: float | None = None) -> None:
     log.info(msg)
     if cb:
-        cb(msg)
+        cb(msg, fraction)
+
+
+def _flatpak_progress(status: Status | None, app: AppInfo, verb: str) -> Callable[[str], None]:
+    """An ``on_line`` for flatpak transactions: progress ticks become status updates,
+    the rest of flatpak's chatter (tables, permission lists) is only logged."""
+    parser = FlatpakProgress(app.app_id, app.name, verb)
+
+    def on_line(line: str) -> None:
+        tick = parser.feed(line)
+        if tick is None:
+            log.debug("flatpak: %s", line)
+        elif status:
+            status(*tick)
+
+    return on_line
 
 
 def _fetch_manifest(app: AppInfo, source: InstallSource, api: FlatsonarAPI, status) -> Path:
@@ -215,19 +242,20 @@ def _pull(app: AppInfo, source: InstallSource, api: FlatsonarAPI, status) -> _Pr
             _status(status, f"Adding remote {remote}…")
             fp.ensure_remote(remote, source.remote_url)
         ref = source.ref or f"app/{app.app_id}/{fp.default_arch()}/stable"
-        _status(status, f"Downloading {app.name} (not installing yet)…")
-        fp.pull(remote, ref, on_line=status)
+        _status(status, f"Downloading {app.name} (not installing yet)…", 0.0)
+        fp.pull(remote, ref, on_line=_flatpak_progress(status, app, "Downloading"))
         prep.ref = ref
         _checkout_local(app, prep, remote, None, status)
 
     elif source.kind == "bundle" and source.bundle_url:
         dest = fp.CACHE / "bundles" / f"{app.app_id}.flatpak"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        _status(status, f"Downloading {app.name} bundle…")
-        api.download(source.bundle_url, str(dest), progress=lambda f: status and status(f"Downloading… {f:.0%}"))
+        _status(status, f"Downloading {app.name} bundle…", 0.0)
+        api.download(source.bundle_url, str(dest),
+                     progress=lambda f: status and status(f"Downloading {app.name} bundle · {f:.0%}", f))
         prep.bundle_path = dest
         _status(status, "Importing bundle (not installing yet)…")
-        fp.pull_bundle(dest, on_line=status)
+        fp.pull_bundle(dest, on_line=_flatpak_progress(status, app, "Importing"))
         _checkout_local(app, prep, None, None, status)
     else:
         raise fp.FlatpakError(f"no usable install source for {app.app_id}")
@@ -238,8 +266,8 @@ def _pull_update(app: AppInfo, installed: InstalledApp, status) -> _Prepared:
     """``flatpak update --no-deploy`` from wherever the app was installed, then check out
     the new commit so gate two can look at it."""
     prep = _Prepared(InstallSource(kind="update"), installation=installed.installation, update=True)
-    _status(status, f"Downloading {app.name} update (not installing yet)…")
-    fp.pull_update(app.app_id, installed.installation, on_line=status)
+    _status(status, f"Downloading {app.name} update (not installing yet)…", 0.0)
+    fp.pull_update(app.app_id, installed.installation, on_line=_flatpak_progress(status, app, "Downloading"))
     prep.ref = installed.ref or None
     _checkout_local(app, prep, installed.origin or None, fp.repo_for(installed.installation), status)
     return prep
@@ -295,17 +323,30 @@ def _score(app: AppInfo, prep: _Prepared) -> RiskReport:
 
 def _deploy(app: AppInfo, prep: _Prepared, status) -> None:
     src = prep.source
-    _status(status, "Updating…" if prep.update else "Installing…")
+    verb = "Updating" if prep.update else "Installing"
+    _status(status, f"{verb} {app.name}…")
+    on_line = _flatpak_progress(status, app, verb)
     if prep.update:
-        fp.deploy_update(app.app_id, prep.installation, on_line=status)
+        fp.deploy_update(app.app_id, prep.installation, on_line=on_line)
     elif src.kind in ("flathub", "remote"):
-        fp.deploy(src.remote_name or "flathub", prep.ref or "", on_line=status)
+        fp.deploy(src.remote_name or "flathub", prep.ref or "", on_line=on_line)
     elif src.kind == "bundle":
         assert prep.bundle_path
-        fp.deploy_bundle(prep.bundle_path, on_line=status)
+        fp.deploy_bundle(prep.bundle_path, on_line=on_line)
     elif src.kind == "manifest":
         assert prep.local_repo and prep.ref
-        fp.deploy_local_build(prep.local_repo, prep.ref, on_line=status)
+        fp.deploy_local_build(prep.local_repo, prep.ref, on_line=on_line)
+
+
+def _scan(prep: _Prepared, status) -> ScanResult:
+    target = prep.checkout or prep.bundle_path
+    if target is None:
+        if clamav_available():
+            return ScanResult(ran=False, skipped="ostree is not installed, so the download could not be "
+                                                 "unpacked for ClamAV")
+        return ScanResult(ran=False)
+    _status(status, "Scanning with ClamAV…")
+    return prep.scanner.scan(target) if prep.scanner is not None else scan(target)
 
 
 # --- the flow -------------------------------------------------------------------------
@@ -331,12 +372,7 @@ def _inspect_and_deploy(app: AppInfo, prep: _Prepared, report: RiskReport, confi
     """Gate two on what was actually pulled or built, then deploy. Cleans up the checkout."""
     try:
         report.extend(_score(app, prep).findings)
-        scan_result = ScanResult(ran=False)
-        if prep.checkout:
-            _status(status, "Scanning with ClamAV…")
-            scan_result = scan(prep.checkout)
-        elif prep.bundle_path:
-            scan_result = scan(prep.bundle_path)
+        scan_result = _scan(prep, status)
         for path, sig in scan_result.infected:
             report.escalate(RiskLevel.RED, "clamav", f"{sig} in {Path(path).name}")
         if scan_result.error:
@@ -356,7 +392,7 @@ def _inspect_and_deploy(app: AppInfo, prep: _Prepared, report: RiskReport, confi
 
 
 def install(app: AppInfo, api: FlatsonarAPI, confirmer: Confirmer, decisions: Decisions,
-            status: Callable[[str], None] | None = None) -> Outcome:
+            status: Status | None = None) -> Outcome:
     source = pick_source(app.sources)
     if source is None:
         return Outcome(installed=False, message="This app has no known install source.")
@@ -366,6 +402,7 @@ def install(app: AppInfo, api: FlatsonarAPI, confirmer: Confirmer, decisions: De
     report = trust_report(app, source)
 
     # Gate 1: publisher + manifest, before any build runs.
+    mpath: Path | None = None
     if source.kind == "manifest":
         if not source.manifest_url:
             return Outcome(installed=False, message="This app has no manifest to build from.")
@@ -373,17 +410,21 @@ def install(app: AppInfo, api: FlatsonarAPI, confirmer: Confirmer, decisions: De
         report.extend(audit_downloaded_manifest(app, mpath).findings)
         if not _gate(app, report, None, confirmer, decisions):
             return Outcome(installed=False, cancelled=True, report=report)
-        prep = _build(app, source, mpath, status)
-    else:
-        prep = _pull(app, source, api, status)
 
-    # Gate 2: what we actually got.
-    return _inspect_and_deploy(app, prep, report, confirmer, decisions, status,
-                               plain_confirm=True, done_message=f"{app.name} installed.")
+    scanner = start_scanner()
+    try:
+        prep = _build(app, source, mpath, status) if mpath is not None else _pull(app, source, api, status)
+        prep.scanner = scanner
+        # Gate 2: what we actually got.
+        return _inspect_and_deploy(app, prep, report, confirmer, decisions, status,
+                                   plain_confirm=True, done_message=f"{app.name} installed.")
+    finally:
+        if scanner is not None:
+            scanner.close()
 
 
 def update(app: AppInfo, installed: InstalledApp, api: FlatsonarAPI, confirmer: Confirmer,
-           decisions: Decisions, status: Callable[[str], None] | None = None) -> Outcome:
+           decisions: Decisions, status: Status | None = None) -> Outcome:
     """Update an installed app through the same gates as an install.
 
     Apps that came from a remote (Flathub, a project remote) are updated with ``flatpak
@@ -407,6 +448,12 @@ def update(app: AppInfo, installed: InstalledApp, api: FlatsonarAPI, confirmer: 
     # The publisher may have been re-assessed since the install (an id collision, a repo
     # that turned suspicious). Findings already accepted do not nag; new ones do.
     report = trust_report(app)
-    prep = _pull_update(app, installed, status)
-    return _inspect_and_deploy(app, prep, report, confirmer, decisions, status,
-                               plain_confirm=False, done_message=f"{app.name} updated.")
+    scanner = start_scanner()
+    try:
+        prep = _pull_update(app, installed, status)
+        prep.scanner = scanner
+        return _inspect_and_deploy(app, prep, report, confirmer, decisions, status,
+                                   plain_confirm=False, done_message=f"{app.name} updated.")
+    finally:
+        if scanner is not None:
+            scanner.close()

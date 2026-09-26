@@ -23,6 +23,7 @@ def fake(monkeypatch, tmp_path):
     monkeypatch.setattr(fp, "CACHE", tmp_path / "cache")
     monkeypatch.setattr(ff, "PACE", 0.0)
     monkeypatch.setattr(pipeline, "scan", lambda path: ScanResult(ran=True, scanned_files=2))
+    monkeypatch.setattr(pipeline, "start_scanner", lambda: None)
     # Record the real functions so monkeypatch puts them back after activate() swaps them.
     for name in ff._PATCHED:
         monkeypatch.setattr(fp, name, getattr(fp, name))

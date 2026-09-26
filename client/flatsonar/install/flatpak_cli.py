@@ -16,20 +16,33 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..paths import cache_dir, data_dir
+from ..paths import cache_dir, data_dir, home
 
 log = logging.getLogger("flatsonar.flatpak")
-
-FLATPAK_USER_ROOT = data_dir() / "flatpak"
-FLATPAK_SYSTEM_ROOT = Path("/var/lib/flatpak")
-FLATPAK_USER_REPO = FLATPAK_USER_ROOT / "repo"
-CACHE = cache_dir() / "flatsonar"
-LOCAL_REMOTE = "flatsonar-local"  # where locally built (manifest-only) apps are exported
-INSTALLATIONS = ("user", "system")
 
 # When Flatsonar itself runs as a Flatpak, host commands go through the portal.
 IN_SANDBOX = Path("/.flatpak-info").exists()
 HOST_PREFIX = ["flatpak-spawn", "--host"] if IN_SANDBOX else []
+
+
+def _host_data_dir() -> Path:
+    """The *host's* XDG data directory. Inside our own sandbox XDG_DATA_HOME points at
+    ~/.var/app/<id>/data, which is not where flatpak keeps the per-user installation;
+    flatpak passes the host's own value on as HOST_XDG_DATA_HOME when there is one."""
+    if IN_SANDBOX:
+        return Path(os.environ.get("HOST_XDG_DATA_HOME") or home() / ".local/share")
+    return data_dir()
+
+
+FLATPAK_USER_ROOT = (Path(os.environ["FLATPAK_USER_DIR"]) if os.environ.get("FLATPAK_USER_DIR") and not IN_SANDBOX
+                     else _host_data_dir() / "flatpak")
+FLATPAK_SYSTEM_ROOT = Path("/var/lib/flatpak")
+FLATPAK_USER_REPO = FLATPAK_USER_ROOT / "repo"
+# In the sandbox this is ~/.var/app/<id>/cache/flatsonar: the same path on the host, so
+# host-side ostree and ClamAV can write and read the checkouts made here.
+CACHE = cache_dir() / "flatsonar"
+LOCAL_REMOTE = "flatsonar-local"  # where locally built (manifest-only) apps are exported
+INSTALLATIONS = ("user", "system")
 
 
 class FlatpakError(RuntimeError):
@@ -38,11 +51,13 @@ class FlatpakError(RuntimeError):
 
 def _run(cmd: list[str], on_line: Callable[[str], None] | None = None, check: bool = True,
          env: dict[str, str] | None = None) -> str:
-    cmd = HOST_PREFIX + cmd
+    # A fixed locale so the output parses the same everywhere; flatpak-spawn does not
+    # forward our environment to the host, so it has to be passed explicitly there.
+    cmd = (HOST_PREFIX + ["--env=LC_ALL=C.UTF-8"] if IN_SANDBOX else []) + cmd
     log.debug("$ %s", " ".join(cmd))
     proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
-        env={**os.environ, "LC_ALL": "C.UTF-8", **(env or {})},
+        cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+        encoding="utf-8", errors="replace", env={**os.environ, "LC_ALL": "C.UTF-8", **(env or {})},
     )
     lines: list[str] = []
     assert proc.stdout is not None
@@ -58,17 +73,29 @@ def _run(cmd: list[str], on_line: Callable[[str], None] | None = None, check: bo
     return out
 
 
+_found_on_host: dict[str, str] = {}
+
+
 def host_which(name: str) -> str | None:
     """Resolve a command on the *host*. ``shutil.which`` only ever sees this sandbox's
     own filesystem, which never ships host tooling (flatpak, ostree, flatpak-builder,
-    clamscan, ...) - checking it always says "not found" regardless of the host."""
+    clamscan, ...) - checking it always says "not found" regardless of the host.
+
+    Hits are remembered: in the sandbox every lookup is a host round trip, and one
+    install asks for the same few tools several times. Misses are not, so installing
+    the tool while Flatsonar runs is noticed."""
+    if name in _found_on_host:
+        return _found_on_host[name]
     if not IN_SANDBOX:
-        return shutil.which(name)
-    try:
-        out = _run(["sh", "-c", f"command -v {shlex.quote(name)}"], check=False).strip()
-    except OSError:
-        return None
-    return out or None
+        found = shutil.which(name)
+    else:
+        try:
+            found = _run(["sh", "-c", f"command -v {shlex.quote(name)}"], check=False).strip() or None
+        except OSError:
+            found = None
+    if found:
+        _found_on_host[name] = found
+    return found
 
 
 def available() -> bool:
@@ -189,22 +216,31 @@ def ensure_remote(name: str, url: str, gpg_verify: bool = True) -> None:
     _run(cmd + [name, url])
 
 
+# ``-y`` rather than ``--noninteractive``: both answer every question with yes, but
+# ``--noninteractive`` also silences the transaction table and the per-step progress
+# ("Installing 1/2… 25%  6.9 MB/s  00:12"), which install/progress.py turns into a
+# progress bar. stdin is /dev/null, so an unexpected question reads EOF and aborts.
+YES = "-y"
+
+
 def pull(remote: str, ref: str, on_line=None) -> None:
     """Download into the local repo without deploying."""
-    _run(["flatpak", "install", "--user", "--noninteractive", "--no-deploy", remote, ref], on_line)
+    _run(["flatpak", "install", "--user", YES, "--no-deploy", remote, ref], on_line)
 
 
 def pull_bundle(path: Path, on_line=None) -> None:
-    _run(["flatpak", "install", "--user", "--noninteractive", "--no-deploy", str(path)], on_line)
+    _run(["flatpak", "install", "--user", YES, "--no-deploy", str(path)], on_line)
 
 
 def deploy(remote: str, ref: str, on_line=None) -> None:
-    """Second install: objects are already local, so this just deploys."""
-    _run(["flatpak", "install", "--user", "--noninteractive", "--reinstall", remote, ref], on_line)
+    """Second install: objects are already local, so this just deploys. (Not
+    ``--no-pull``: that skips the app's .Locale extension, which ``--no-deploy`` only
+    fetched partially, for the user's own languages.)"""
+    _run(["flatpak", "install", "--user", YES, "--reinstall", remote, ref], on_line)
 
 
 def deploy_bundle(path: Path, on_line=None) -> None:
-    _run(["flatpak", "install", "--user", "--noninteractive", "--reinstall", str(path)], on_line)
+    _run(["flatpak", "install", "--user", YES, "--reinstall", str(path)], on_line)
 
 
 def uninstall(app_id: str, on_line=None, installation: str = "user") -> None:
@@ -214,11 +250,11 @@ def uninstall(app_id: str, on_line=None, installation: str = "user") -> None:
 def pull_update(app_id: str, installation: str = "user", on_line=None) -> None:
     """Fetch the new commit into the local repo without deploying it, so it can be
     checked out, scanned and re-scored first (same trick as :func:`pull`)."""
-    _run(["flatpak", "update", _installation_flag(installation), "--noninteractive", "--no-deploy", app_id], on_line)
+    _run(["flatpak", "update", _installation_flag(installation), YES, "--no-deploy", app_id], on_line)
 
 
 def deploy_update(app_id: str, installation: str = "user", on_line=None) -> None:
-    _run(["flatpak", "update", _installation_flag(installation), "--noninteractive", app_id], on_line)
+    _run(["flatpak", "update", _installation_flag(installation), YES, app_id], on_line)
 
 
 def launch(app_id: str) -> None:
@@ -240,14 +276,19 @@ def local_refs(app_id: str, repo: Path = FLATPAK_USER_REPO) -> list[str]:
 
 
 def checkout(ref: str, dest: Path, repo: Path = FLATPAK_USER_REPO) -> Path:
-    """Materialise a commit into ``dest`` so ClamAV can read it."""
+    """Materialise a commit into ``dest`` so ClamAV can read it.
+
+    Hardlinks into the repo rather than ``--force-copy``: instant even for a
+    multi-hundred-megabyte app, and no second copy on disk. Nothing writes to the
+    checkout (ClamAV only reads it, then it is deleted), and ostree falls back to
+    copying by itself when it cannot link (another filesystem, a root-owned repo)."""
     if host_which("ostree") is None:
         raise FlatpakError("ostree binary not found; install the 'ostree' package")
     if dest.exists():
         shutil.rmtree(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     commit = _run(["ostree", f"--repo={repo}", "rev-parse", ref]).strip()
-    _run(["ostree", f"--repo={repo}", "checkout", "--user-mode", "--force-copy", commit, str(dest)])
+    _run(["ostree", f"--repo={repo}", "checkout", "--user-mode", commit, str(dest)])
     return dest
 
 
@@ -281,4 +322,4 @@ def build_from_manifest(manifest_path: Path, app_id: str, on_line=None) -> tuple
 
 def deploy_local_build(repo: Path, ref: str, on_line=None) -> None:
     ensure_remote(LOCAL_REMOTE, str(repo), gpg_verify=False)
-    _run(["flatpak", "install", "--user", "--noninteractive", "--reinstall", LOCAL_REMOTE, ref], on_line)
+    _run(["flatpak", "install", "--user", YES, "--reinstall", LOCAL_REMOTE, ref], on_line)

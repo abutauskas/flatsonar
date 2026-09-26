@@ -51,6 +51,10 @@ class AppInfo:
     repo_created_at: str | None = None
     repo_pushed_at: str | None = None
     latest_version: str | None = None
+    archived: bool = False
+    manifest_ok: bool = True
+    manifest_error: str | None = None
+    first_seen: str | None = None
     sources: list[InstallSource] = field(default_factory=list)
 
     @classmethod
@@ -87,11 +91,11 @@ class FlatsonarAPI:
         self.base = base_url.rstrip("/")
         # The free-tier default server spins down after idling and can take 50s+ to
         # wake back up on the next request; a short timeout would fail that first call.
-        self._client = httpx.Client(base_url=self.base, timeout=75.0, headers={"User-Agent": "Flatsonar-client/0.1"})
+        self._client = httpx.Client(base_url=self.base, timeout=75.0, headers={"User-Agent": "Flatsonar-client/1.0"})
 
     def list_apps(self, q: str | None = None, category: str | None = None, risk: str | None = None,
                   trust: str | None = None, maintenance: str | None = None, sort: str = "name", page: int = 1,
-                  per_page: int = 48, funding_only: bool = False, ids: list[str] | None = None) -> Page:
+                  per_page: int = 36, funding_only: bool = False, ids: list[str] | None = None) -> Page:
         params: dict[str, Any] = {"page": page, "per_page": per_page, "sort": sort}
         if ids is not None:
             params["ids"] = ",".join(ids)
@@ -137,14 +141,19 @@ class FlatsonarAPI:
         return r.json()
 
     def download(self, url: str, dest: str, progress=None) -> str:
-        with httpx.stream("GET", url, follow_redirects=True, timeout=None) as r:
+        """Stream ``url`` to ``dest``. ``progress(fraction)`` fires once per whole percent,
+        not per chunk: a fast link would otherwise queue hundreds of UI updates a second."""
+        # Headers only: a bundle on a slow host must not trip the API's 75 s read timeout.
+        timeout = httpx.Timeout(30.0, read=120.0)
+        with self._client.stream("GET", url, follow_redirects=True, timeout=timeout) as r:
             r.raise_for_status()
             total = int(r.headers.get("content-length") or 0)
-            got = 0
+            got, shown = 0, -1
             with open(dest, "wb") as f:
-                for chunk in r.iter_bytes(1 << 16):
+                for chunk in r.iter_bytes(1 << 20):
                     f.write(chunk)
                     got += len(chunk)
-                    if progress and total:
+                    if progress and total and int(got * 100 / total) != shown:
+                        shown = int(got * 100 / total)
                         progress(got / total)
         return dest

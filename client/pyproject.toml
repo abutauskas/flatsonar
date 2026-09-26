@@ -17,6 +17,9 @@ flatsonar = "flatsonar.main:main"
 [tool.setuptools.packages.find]
 include = ["flatsonar*"]
 
+[tool.setuptools.package-data]
+flatsonar = ["assets/*.svg"]
+
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 

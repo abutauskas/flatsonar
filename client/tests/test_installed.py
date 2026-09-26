@@ -39,6 +39,39 @@ def test_deployed_metadata_reads_the_active_deploy(tmp_path, monkeypatch):
     assert fp.deployed_metadata("org.x.Missing", "user") is None
 
 
+def test_host_data_dir_ignores_the_sandboxed_xdg_data_home(monkeypatch, tmp_path):
+    """Inside the Flatpak, XDG_DATA_HOME is ~/.var/app/<id>/data; flatpak's per-user
+    installation is still in the *host's* data dir. Looking in the sandboxed one meant
+    no pulled app was ever unpacked or scanned."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / ".var/app/io.github.abutauskas.Flatsonar/data"))
+    monkeypatch.delenv("HOST_XDG_DATA_HOME", raising=False)
+    monkeypatch.setattr(fp, "IN_SANDBOX", True)
+    assert fp._host_data_dir() == tmp_path / ".local/share"
+    monkeypatch.setenv("HOST_XDG_DATA_HOME", str(tmp_path / "custom"))
+    assert fp._host_data_dir() == tmp_path / "custom"
+    monkeypatch.setattr(fp, "IN_SANDBOX", False)
+    assert fp._host_data_dir() == tmp_path / ".var/app/io.github.abutauskas.Flatsonar/data"
+
+
+def test_host_which_remembers_hits_but_not_misses(monkeypatch):
+    lookups = []
+    found = {"ostree": "/usr/bin/ostree"}
+
+    def _which(name):
+        lookups.append(name)
+        return found.get(name)
+
+    monkeypatch.setattr(fp, "IN_SANDBOX", False)
+    monkeypatch.setattr(fp.shutil, "which", _which)
+    monkeypatch.setattr(fp, "_found_on_host", {})
+    assert fp.host_which("ostree") == fp.host_which("ostree") == "/usr/bin/ostree"
+    assert fp.host_which("clamscan") is None
+    found["clamscan"] = "/usr/bin/clamscan"  # installed while Flatsonar runs
+    assert fp.host_which("clamscan") == "/usr/bin/clamscan"
+    assert lookups == ["ostree", "clamscan", "clamscan"]
+
+
 def test_version_newer():
     assert pipeline.version_newer("1.2.1", "1.2.0")
     assert pipeline.version_newer("v2.0", "1.9.9")

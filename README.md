@@ -169,8 +169,12 @@ future updates will come from that remote.
 **Gate two, after pull or build.**
 
 1. `flatpak install --no-deploy` pulls the app into the local OSTree repo without deploying it
-   (or `flatpak-builder` builds it into a local repo).
-2. `ostree checkout` materialises the files; ClamAV scans them.
+   (or `flatpak-builder` builds it into a local repo), with a progress bar fed from
+   flatpak's own progress output. ClamAV starts at the same time: loading its signature
+   database is most of a scan's cost, so it loads while the download runs and then waits
+   for the path to scan (a running `clamd` is used instead when there is one).
+2. `ostree checkout` materialises the files (hardlinked into the repo, not copied); ClamAV
+   scans them.
 3. The deployed `metadata` file is parsed back into `finish-args` and scored with
    `flatsonar_core.risk` (host filesystem, `--device=all`, session/system bus, sandbox
    escape via `org.freedesktop.Flatpak`, `LD_PRELOAD`, credential paths ... -> red;

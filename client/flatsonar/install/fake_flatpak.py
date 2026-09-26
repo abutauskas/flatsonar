@@ -168,6 +168,17 @@ class FakeFlatpak:
             if on_line:
                 on_line(f"[fake flatpak] {what} {i * 100 // steps}%")
 
+    @staticmethod
+    def _transaction(on_line, app_id: str, steps: int = 4, verb: str = "Installing") -> None:
+        """What ``flatpak install -y`` prints without a terminal (see install/progress.py)."""
+        if on_line:
+            on_line(f" 1.\t   \t{app_id}\tstable\ti\tflathub\t< 12.4\xa0MB")
+        for i in range(steps + 1):
+            time.sleep(PACE)
+            pct = i * 100 // steps
+            if on_line:
+                on_line(f"{verb} 1/1… {'█' * (pct // 10):<10}  {pct:>3}%  3.1\xa0MB/s  00:0{steps - i}")
+
     # -- flatpak_cli surface --------------------------------------------------------------
 
     def available(self) -> bool:
@@ -198,20 +209,20 @@ class FakeFlatpak:
     def pull(self, remote: str, ref: str, on_line=None) -> None:
         app_id = self._app_id(ref)
         known = self.apps.get(app_id)
-        self._progress(on_line, f"downloading {app_id} from {remote}")
+        self._transaction(on_line, app_id)
         self.staged[app_id] = Staged(app_id, known.version if known else "1.0", remote,
                                      finish_args=list(known.finish_args) if known else None)
 
     def pull_bundle(self, path: Path, on_line=None) -> None:
         app_id = Path(path).name.removesuffix(".flatpak")
-        self._progress(on_line, f"importing bundle {Path(path).name}")
+        self._transaction(on_line, app_id)
         self.staged[app_id] = Staged(app_id, "1.0", "")
 
     def pull_update(self, app_id: str, installation: str = "user", on_line=None) -> None:
         a = self.apps.get(app_id)
         if a is None:
             raise fp.FlatpakError(f"[fake flatpak] {app_id} is not installed")
-        self._progress(on_line, f"downloading {app_id} update")
+        self._transaction(on_line, app_id, verb="Updating")
         if a.next_version:
             self.staged[app_id] = Staged(app_id, a.next_version, a.origin, installation,
                                          list(a.next_finish_args if a.next_finish_args is not None else a.finish_args))
@@ -251,16 +262,16 @@ class FakeFlatpak:
 
     def deploy(self, remote: str, ref: str, on_line=None) -> None:
         app_id = self._app_id(ref)
-        self._progress(on_line, f"installing {app_id}", 2)
+        self._transaction(on_line, app_id, 2)
         self._deploy_staged(app_id, origin=remote)
 
     def deploy_bundle(self, path: Path, on_line=None) -> None:
         app_id = Path(path).name.removesuffix(".flatpak")
-        self._progress(on_line, f"installing {app_id}", 2)
+        self._transaction(on_line, app_id, 2)
         self._deploy_staged(app_id, origin="")
 
     def deploy_update(self, app_id: str, installation: str = "user", on_line=None) -> None:
-        self._progress(on_line, f"updating {app_id}", 2)
+        self._transaction(on_line, app_id, 2, verb="Updating")
         self._deploy_staged(app_id, installation=installation)
 
     def uninstall(self, app_id: str, on_line=None, installation: str = "user") -> None:
@@ -289,7 +300,7 @@ class FakeFlatpak:
 
     def deploy_local_build(self, repo: Path, ref: str, on_line=None) -> None:
         app_id = self._app_id(ref)
-        self._progress(on_line, f"installing {app_id} from local build", 2)
+        self._transaction(on_line, app_id, 2)
         self._deploy_staged(app_id, origin=fp.LOCAL_REMOTE)
 
 

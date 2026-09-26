@@ -7,9 +7,10 @@ is already here. Rows for apps the index knows open their store page."""
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, GLib, Gtk
 
 from flatsonar_core import RiskReport, metadata_to_finish_args, score_finish_args
 
@@ -18,7 +19,7 @@ from ..asyncjob import run_async
 from ..icons import load_into
 from ..install import flatpak_cli as fp
 from ..install.flatpak_cli import InstalledApp
-from ..widgets import risk_pill
+from ..widgets import RadarMark, risk_pill
 
 log = logging.getLogger("flatsonar.installed")
 
@@ -60,17 +61,27 @@ class Entry:
 
 def load_entries(installed: dict[str, InstalledApp], updates: set[str], api) -> list[Entry]:
     """Worker-thread half: read every deployed ``metadata``, score it, ask the index.
-    ``updates`` is the window's resolved set (remotes plus index versions)."""
+    ``updates`` is the window's resolved set (remotes plus index versions).
+
+    The index lookup (network) runs while the metadata is read, and the reads run in
+    parallel: a metadata file the sandbox cannot see directly costs one ``flatpak info``
+    round trip to the host, and a machine with a hundred apps would wait on them one by
+    one otherwise."""
     entries = [Entry(a) for a in installed.values()]
-    for e in entries:
+
+    def _score(e: Entry) -> None:
         meta = fp.deployed_metadata(e.installed.app_id, e.installed.installation)
         if meta:
             e.report = score_finish_args(metadata_to_finish_args(meta), e.installed.app_id)
+
     infos: dict[str, AppInfo] = {}
-    try:
-        infos = api.apps_by_id(list(installed))
-    except Exception as exc:  # offline: the local half is still useful
-        log.warning("index lookup failed: %s", exc)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        lookup = pool.submit(api.apps_by_id, list(installed))
+        list(pool.map(_score, entries))
+        try:
+            infos = lookup.result()
+        except Exception as exc:  # offline: the local half is still useful
+            log.warning("index lookup failed: %s", exc)
     for e in entries:
         e.info = infos.get(e.installed.app_id)
         e.update = e.installed.app_id in updates
@@ -82,7 +93,7 @@ class InstalledPage(Adw.NavigationPage):
         super().__init__(title="Installed", tag="installed")
         self.window = window
         self.entries: list[Entry] = []
-        self._rows: dict[str, tuple[Adw.ActionRow, Gtk.Spinner, Gtk.Button | None]] = {}
+        self._rows: dict[str, tuple[Adw.ActionRow, Gtk.Spinner, Gtk.Button | None, str]] = {}
 
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
@@ -98,7 +109,7 @@ class InstalledPage(Adw.NavigationPage):
 
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         loading = Adw.StatusPage(title="Looking at what is installed…")
-        loading.set_child(Gtk.Spinner(spinning=True, width_request=32, height_request=32))
+        loading.set_child(RadarMark(64, spinning=True))
         self.stack.add_named(loading, "loading")
         self.stack.add_named(Adw.StatusPage(icon_name="application-x-executable-symbolic", title="Nothing installed",
                                             description="Flatpak apps you install show up here, "
@@ -162,9 +173,11 @@ class InstalledPage(Adw.NavigationPage):
 
     def _row(self, e: Entry) -> Adw.ActionRow:
         version = e.installed.version or "unknown version"
-        row = Adw.ActionRow(title=e.name, subtitle=f"{version} · from {e.origin_text}")
-        icon = Gtk.Image(pixel_size=32, valign=Gtk.Align.CENTER)
-        icon.add_css_class("app-icon")
+        subtitle = f"{version} · from {e.origin_text}"
+        row = Adw.ActionRow(title=e.name, subtitle=subtitle)
+        icon = Gtk.Image(pixel_size=40, valign=Gtk.Align.CENTER, margin_top=6, margin_bottom=6)
+        icon.add_css_class("fs-app-icon")
+        icon.set_overflow(Gtk.Overflow.HIDDEN)
         load_into(icon, e.info.icon_url if e.info else None)
         row.add_prefix(icon)
 
@@ -185,10 +198,10 @@ class InstalledPage(Adw.NavigationPage):
         if e.info:
             row.set_activatable(True)
             row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
-            row.connect("activated", lambda _r, app_id=e.installed.app_id: self.window.open_app(app_id))
+            row.connect("activated", lambda _r, e=e: self.window.open_app(e.installed.app_id, e.info))
         else:
             row.set_tooltip_text("Not in the Flatsonar index")
-        self._rows[e.installed.app_id] = (row, spinner, update_btn)
+        self._rows[e.installed.app_id] = (row, spinner, update_btn, subtitle)
         return row
 
     # --- state -----------------------------------------------------------------------
@@ -197,9 +210,17 @@ class InstalledPage(Adw.NavigationPage):
         found = self._rows.get(app_id)
         if not found:
             return
-        row, spinner, btn = found
+        row, spinner, btn, subtitle = found
         spinner.set_visible(busy)
         spinner.set_spinning(busy)
         if btn is not None:
             btn.set_sensitive(not busy)
         row.set_sensitive(not busy)
+        if not busy:
+            row.set_subtitle(subtitle)
+
+    def set_progress(self, app_id: str, text: str) -> None:
+        """What the install/update of this app is doing right now, in place of its subtitle."""
+        found = self._rows.get(app_id)
+        if found:
+            found[0].set_subtitle(GLib.markup_escape_text(text))

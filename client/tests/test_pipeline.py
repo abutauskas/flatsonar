@@ -92,6 +92,7 @@ def fake_flatpak(monkeypatch, tmp_path):
     monkeypatch.setattr(fp, "deploy_update",
                         lambda app_id, installation="user", on_line=None: calls.append(("deploy-update", app_id, installation)))
     monkeypatch.setattr(pipeline, "scan", lambda path: ScanResult(ran=True, scanned_files=3))
+    monkeypatch.setattr(pipeline, "start_scanner", lambda: None)  # cold scan() above instead
     return calls, meta
 
 
@@ -188,6 +189,17 @@ def test_clamav_hit_escalates_green_to_red(fake_flatpak, tmp_path, monkeypatch):
     assert out.report.level.label == "red"
     assert conf.calls == ["warn", "again"]
     assert any("Eicar" in r for r in out.report.reasons)
+
+
+def test_scan_skipped_is_explained_when_clamav_exists_but_nothing_was_unpacked(fake_flatpak, tmp_path, monkeypatch):
+    """No ostree on the host: ClamAV is there, but there was nothing to point it at. The
+    dialog must not claim ClamAV is missing."""
+    monkeypatch.setattr(fp, "local_refs", lambda app_id, repo=None: [])
+    monkeypatch.setattr(pipeline, "clamav_available", lambda: True)
+    conf = FakeConfirmer([True])
+    out = pipeline.install(_app(), FakeAPI(), conf, _decisions(tmp_path))
+    assert out.installed and not out.scan.ran
+    assert "ostree" in out.scan.skipped
 
 
 def test_index_permissions_used_when_no_checkout(fake_flatpak, tmp_path, monkeypatch):

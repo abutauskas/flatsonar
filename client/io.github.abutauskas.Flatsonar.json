@@ -11,9 +11,8 @@
         "--socket=wayland",
         "--device=dri",
         "--talk-name=org.freedesktop.Flatpak",
-        "--filesystem=~/.local/share/flatpak:ro",
-        "--filesystem=xdg-cache/flatsonar:create",
-        "--filesystem=xdg-data/flatsonar:create"
+        "--filesystem=xdg-data/flatpak/app:ro",
+        "--filesystem=/var/lib/flatpak/app:ro"
     ],
     "cleanup": ["/share/man", "*.a", "*.la"],
     "modules": [
@@ -59,7 +58,7 @@
                 "install -Dm644 data/io.github.abutauskas.Flatsonar.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.abutauskas.Flatsonar.metainfo.xml",
                 "install -Dm644 data/icons/io.github.abutauskas.Flatsonar.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.abutauskas.Flatsonar.svg"
             ],
-            "sources": [{"type": "dir", "path": "."}]
+            "sources": [{"type": "dir", "path": ".", "skip": ["build-dir", "repo", "tests", ".pytest_cache", "flatsonar.egg-info", "flatsonar.flatpak"]}]
         }
     ]
 }
