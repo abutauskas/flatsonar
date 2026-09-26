@@ -41,6 +41,8 @@ from flatsonar_core import (
     RiskLevel,
     RiskReport,
     audit_manifest,
+    describe_template_problems,
+    manifest_template_problems,
     metadata_to_finish_args,
     parse_manifest,
     score_finish_args,
@@ -220,6 +222,16 @@ def audit_downloaded_manifest(app: AppInfo, mpath: Path) -> RiskReport:
                         f"the manifest builds {manifest.app_id}, not {app.app_id}")
     report.extend(audit_manifest(manifest))
     return report
+
+
+def template_problems(mpath: Path) -> list[str]:
+    """Why the downloaded manifest can't be built as committed (an unfilled release
+    template such as VERSION_PLACEHOLDER in its URLs); [] when it can, or when it does
+    not parse at all - :func:`audit_downloaded_manifest` reports that one."""
+    try:
+        return manifest_template_problems(parse_manifest(mpath))
+    except (ManifestError, OSError):
+        return []
 
 
 def _checkout_local(app: AppInfo, prep: _Prepared, origin: str | None, repo: Path | None, status) -> None:
@@ -407,6 +419,12 @@ def install(app: AppInfo, api: FlatsonarAPI, confirmer: Confirmer, decisions: De
         if not source.manifest_url:
             return Outcome(installed=False, message="This app has no manifest to build from.")
         mpath = _fetch_manifest(app, source, api, status)
+        # Checked here, not only by the crawler: the index can be a week old, and this
+        # is the manifest that would actually be built. No dialog - there is nothing to
+        # accept, flatpak-builder would only fail.
+        problems = template_problems(mpath)
+        if problems:
+            return Outcome(installed=False, message=f"Not building {app.name}: {describe_template_problems(problems)}.")
         report.extend(audit_downloaded_manifest(app, mpath).findings)
         if not _gate(app, report, None, confirmer, decisions):
             return Outcome(installed=False, cancelled=True, report=report)

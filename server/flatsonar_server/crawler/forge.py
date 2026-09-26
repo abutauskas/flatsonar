@@ -18,7 +18,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol
 
-from flatsonar_core import Manifest, is_open_source, parse_manifest_text
+from flatsonar_core import (
+    Manifest,
+    describe_template_problems,
+    is_open_source,
+    manifest_template_problems,
+    parse_manifest_text,
+)
 from flatsonar_core.manifest import ManifestError, looks_like_manifest
 
 from ..models import SourceKind
@@ -247,7 +253,19 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
                         remote_url=forge.raw_url(repo, fr),
                         ref=f"app/{base_id}/x86_64/stable",
                     ))
-        sources.append(SourceSpec(kind=SourceKind.MANIFEST, manifest_url=manifest_url))
+        # A manifest that is still a release template (VERSION_PLACEHOLDER in its URLs,
+        # a checksum that says TODO) is not something anyone can build: never offer it.
+        # With nothing else to install from, the app is not listed - as with a manifest
+        # that stops parsing, an already-listed app is only flagged, and loses the build.
+        template_problems = manifest_template_problems(manifest)
+        manifest_problem = describe_template_problems(template_problems) if template_problems else None
+        if manifest_problem is None:
+            sources.append(SourceSpec(kind=SourceKind.MANIFEST, manifest_url=manifest_url))
+        elif not sources:
+            log.debug("%s:%s: %s", repo.full_name, path, manifest_problem)
+            out.append(Candidate(app_id=base_id, upstream_url=upstream.url if upstream else repo.html_url,
+                                 manifest_error=manifest_problem, drop_sources=[SourceKind.MANIFEST]))
+            continue
 
         icon_path = find_icon(repo.tree, base_id)
         name = (meta.name if meta else None) or repo.full_name.rsplit("/", 1)[-1]
@@ -281,7 +299,9 @@ async def candidates_from_repo(ctx: CrawlContext, forge: Forge, repo: RepoInfo) 
             archived=repo.archived,
             manifest=manifest,
             manifest_url=manifest_url,
+            manifest_problem=manifest_problem,
             sources=sources,
+            drop_sources=[SourceKind.MANIFEST] if manifest_problem else [],
         )
         out.append(await assess(ctx, cand, repo))
     return out

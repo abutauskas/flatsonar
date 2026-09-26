@@ -8,6 +8,8 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
+from flatsonar_core import unfilled
+
 _WS = re.compile(r"\s+")
 _CAMO = re.compile(r"^https?://camo\.githubusercontent\.com/[0-9a-f]{40}/([0-9a-f]+)$", re.IGNORECASE)
 
@@ -154,6 +156,12 @@ def _parse_component(root: ET.Element) -> MetaInfo | None:
     if rel is not None and rel.get("version"):
         info.latest_version = rel.get("version")
     info.icon = _best_cached_icon(root)
+    # A project's committed metainfo is often the build's input template
+    # (<name>@APP_NAME@</name>, <release version="VERSION_PLACEHOLDER">); those values
+    # are not the app's, so callers fall back to what else they know.
+    for attr in ("name", "summary", "developer_name", "latest_version"):
+        if unfilled(getattr(info, attr)):
+            setattr(info, attr, None)
     return info
 
 

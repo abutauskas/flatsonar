@@ -36,6 +36,7 @@ class ManifestSource:
     commit: str | None = None
     branch: str | None = None
     checksum: str | None = None  # sha256 / sha512 / sha1 / md5, whichever was given
+    checksum_type: str | None = None  # which of those it was
     commands: tuple[str, ...] = ()  # shell / script sources
     dest_filename: str | None = None
 
@@ -142,11 +143,12 @@ def _parse_sources(module: dict[str, Any]) -> list[ManifestSource]:
             v = s.get(key)
             return None if v is None else str(v)
 
-        checksum = next((_s(k) for k in ("sha256", "sha512", "sha1", "md5") if s.get(k)), None)
+        checksum_type = next((k for k in ("sha256", "sha512", "sha1", "md5") if s.get(k)), None)
+        checksum = _s(checksum_type) if checksum_type else None
         cmds = s.get("commands") or []
         out.append(ManifestSource(
             kind=_s("type") or "", url=_s("url"), tag=_s("tag"), commit=_s("commit"), branch=_s("branch"),
-            checksum=checksum, commands=tuple(str(c) for c in cmds) if isinstance(cmds, list) else (),
+            checksum=checksum, checksum_type=checksum_type, commands=tuple(str(c) for c in cmds) if isinstance(cmds, list) else (),
             dest_filename=_s("dest-filename"),
         ))
     return out

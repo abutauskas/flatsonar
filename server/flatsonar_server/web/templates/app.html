@@ -124,7 +124,7 @@
         <h2>Maintenance</h2>
         <p class="sub">{{ MAINTENANCE_TIP.get(app.maintenance, '') }}</p>
         {% if not app.manifest_ok %}
-        <p class="fine"><strong>Build may be broken:</strong> the crawler's last visit could no longer parse this app's manifest ({{ app.manifest_error }}). The information below is from the last time it did.</p>
+        <p class="fine"><strong>Build may be broken:</strong> {{ app.manifest_error or "the crawler's last visit could not use this app's manifest" }}.{% if (app.manifest_error or '').startswith('manifest no longer parses') %} The information below is from the last time it did.{% endif %}</p>
         {% endif %}
         {% if app.maintenance_findings %}
         <ul class="findings">

@@ -342,8 +342,8 @@ class AppPage(Adw.NavigationPage):
         app = self.app
         box = _section("Maintenance", MAINTENANCE_TIP.get(app.maintenance, ""))
         if not app.manifest_ok:
-            box.append(label("Build may be broken: the crawler's last visit could no longer parse this app's "
-                             f"manifest ({app.manifest_error or 'unknown error'}).", "fs-fine", wrap=True))
+            reason = app.manifest_error or "the crawler's last visit could not use this app's manifest"
+            box.append(label(f"Build may be broken: {reason}.", "fs-fine", wrap=True))
         if app.maintenance_findings:
             box.append(findings_list([(f.get("level", "yellow"), f.get("reason", ""), f.get("check", ""))
                                       for f in app.maintenance_findings]))

@@ -273,6 +273,22 @@ def test_remote_source_warns_unless_verified(fake_flatpak, tmp_path):
 # --- manifest builds: gate before the build ---------------------------------------------
 
 
+def test_unfilled_template_manifest_is_refused_without_a_build_or_a_dialog(fake_flatpak, tmp_path):
+    """Like Termix's committed manifest: the release workflow fills these in, so the
+    copy in the repository can never download or verify."""
+    calls, _ = fake_flatpak
+    template = CLEAN_MANIFEST.format(app_id="org.x.Green").replace(
+        "      - type: git\n        url: https://github.com/alice/x.git\n        commit: abc\n",
+        "      - type: file\n        url: https://github.com/alice/x/releases/download/release-VERSION_PLACEHOLDER-tag/x"
+        "\n        sha256: CHECKSUM_X64_PLACEHOLDER\n")
+    assert "VERSION_PLACEHOLDER" in template
+    conf = FakeConfirmer([])
+    out = pipeline.install(_app(kind="manifest"), FakeAPI(template), conf, _decisions(tmp_path))
+    assert not out.installed and not out.cancelled
+    assert "VERSION_PLACEHOLDER in a source URL" in out.message
+    assert conf.calls == [] and calls == []
+
+
 def test_manifest_build_gated_before_flatpak_builder_runs(fake_flatpak, tmp_path):
     calls, _ = fake_flatpak
     api = FakeAPI(CLEAN_MANIFEST.format(app_id="org.x.Green"))

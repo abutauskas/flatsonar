@@ -8,6 +8,7 @@ from .metadata import metadata_app_id, metadata_to_finish_args
 from .provenance import Ownership, OwnershipResult, TrustLevel, check_ownership, ownership_finding, trust_from_findings
 from .risk import Finding, RiskLevel, RiskReport, score_finish_args
 from .spdx import is_open_source
+from .template import describe_template_problems, manifest_template_problems, placeholders, unfilled
 
 __all__ = [
     "Finding",
@@ -24,12 +25,16 @@ __all__ = [
     "audit_level",
     "audit_manifest",
     "check_ownership",
+    "describe_template_problems",
     "is_open_source",
+    "manifest_template_problems",
     "metadata_app_id",
     "metadata_to_finish_args",
     "ownership_finding",
     "parse_manifest",
     "parse_manifest_text",
+    "placeholders",
     "score_finish_args",
     "trust_from_findings",
+    "unfilled",
 ]

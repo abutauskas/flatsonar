@@ -20,7 +20,16 @@ import httpx
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from flatsonar_core import Finding, MaintenanceLevel, Manifest, RiskLevel, TrustLevel, is_open_source, score_finish_args
+from flatsonar_core import (
+    Finding,
+    MaintenanceLevel,
+    Manifest,
+    RiskLevel,
+    TrustLevel,
+    is_open_source,
+    score_finish_args,
+    unfilled,
+)
 from flatsonar_core.provenance import same_repo
 
 from ..models import App, InstallSource, ManifestRecord, SourceKind
@@ -280,6 +289,12 @@ class Candidate:
     # longer does. None means "not attempted" or "no change"; upsert_candidate applies
     # it only to a matching existing row, never to create a new one.
     manifest_error: str | None = None
+    # The manifest parses but can't be built as committed (an unfilled release
+    # template): the row is flagged instead of marked healthy. See forge.py.
+    manifest_problem: str | None = None
+    # Install sources this crawl found to be unusable, removed from the row: a stored
+    # manifest source whose manifest turned out to be an unfilled template, say.
+    drop_sources: list[SourceKind] = field(default_factory=list)
 
     @property
     def trust_level(self) -> TrustLevel:
@@ -357,6 +372,11 @@ def _guard_collision(db: Session, app: App, cand: Candidate) -> None:
                   f"candidate {cand.upstream_url} ({cand.trust_level.label}) skipped")
 
 
+def _drop_sources(db: Session, app_id: str, kinds: list[SourceKind]) -> None:
+    if kinds:
+        db.execute(delete(InstallSource).where(InstallSource.app_id == app_id, InstallSource.kind.in_(kinds)))
+
+
 def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
     """Write a candidate into the DB. Returns (app, created). Raises :class:`Skipped`
     when a different publisher already owns the app id.
@@ -379,6 +399,7 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
             return None, False
         app.manifest_ok = False
         app.manifest_error = cand.manifest_error[:500]
+        _drop_sources(db, app.app_id, cand.drop_sources)
         return app, False
     app = db.get(App, cand.app_id)
     created = app is None
@@ -414,6 +435,13 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
         val = getattr(cand, attr)
         if val is not None and val != "" and val != []:
             setattr(app, attr, val)
+    # Template values an older crawl stored (VERSION_PLACEHOLDER, @TAGLINE@) before the
+    # metainfo parser learned to drop them; the loop above never overwrites with nothing.
+    if unfilled(app.summary):
+        app.summary = ""
+    for attr in ("developer_name", "latest_version"):
+        if unfilled(getattr(app, attr)):
+            setattr(app, attr, None)
 
     if cand.stars is not None:
         app.stars = max(app.stars or 0, cand.stars)
@@ -444,8 +472,8 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
 
     if cand.manifest is not None:
         m = cand.manifest
-        app.manifest_ok = True
-        app.manifest_error = None
+        app.manifest_ok = cand.manifest_problem is None
+        app.manifest_error = cand.manifest_problem[:500] if cand.manifest_problem else None
         report = score_finish_args(m.finish_args, m.app_id)
         app.risk_level = report.level.label
         app.risk_reasons = report.reasons
@@ -463,6 +491,7 @@ def upsert_candidate(db: Session, cand: Candidate) -> tuple[App | None, bool]:
         if not app.upstream_url and m.upstream_urls:
             app.upstream_url = m.upstream_urls[0]
 
+    _drop_sources(db, app.app_id, cand.drop_sources)
     existing = {s.kind: s for s in db.scalars(select(InstallSource).where(InstallSource.app_id == app.app_id))}
     for spec in cand.sources:
         row = existing.get(spec.kind)
